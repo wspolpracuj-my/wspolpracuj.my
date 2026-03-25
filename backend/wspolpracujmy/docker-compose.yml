@@ -1,5 +1,16 @@
-
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wspolpracujmy-api
+    depends_on:
+      - db
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=wspolpracujmy;Username=postgres;Password=postgres
+    ports:
+      - "8080:8080"
   db:
     image: postgres:18
     container_name: postgres-wspolpracuj.my

@@ -1,0 +1,80 @@
+Lista potrzebnych endpointow (na podstawie bazy z pliku SQL)
+
+1) Auth i uzytkownicy (Users)
+
+- POST /auth/register
+	- Cel: rejestracja uzytkownika (mail, password, company_TIN).
+	- Zapisuje rekord w Users, verified ustawione domyslnie na false.
+
+- POST /auth/login
+	- Cel: logowanie po mail + password + company_TIN.
+	- Zwraca token sesji/JWT.
+
+- GET /users/me
+	- Cel: pobranie danych zalogowanego uzytkownika.
+
+- PATCH /users/me
+	- Cel: aktualizacja maila/hasla.
+
+- PATCH /users/me/verify
+	- Cel: oznaczenie konta jako verified = true (np. po weryfikacji maila/admina).
+
+2) Firmy (Companies)
+
+- POST /companies
+	- Cel: utworzenie profilu firmy (TIN, name, description, website, contact_email, location).
+	- Powiazanie z Users przez company_TIN.
+
+- GET /companies
+	- Cel: lista firm.
+	- Opcjonalne filtry: service_id, offer_id, location, q (wyszukiwanie po nazwie/opisie).
+
+- GET /companies/:tin
+	- Cel: pobranie szczegolow jednej firmy.
+
+- PATCH /companies/:tin
+	- Cel: aktualizacja danych firmy (name, description, website, contact_email, location, service_id, offer_id).
+
+- DELETE /companies/:tin
+	- Cel: usuniecie profilu firmy (zaleznie od polityki mozna stosowac soft delete).
+
+3) Kategorie uslug (Services)
+
+- GET /services
+	- Cel: lista wszystkich kategorii uslug.
+
+- GET /services/:id
+	- Cel: szczegoly jednej kategorii uslugi.
+
+4) Matchowanie firm (Matches)
+
+- POST /matches
+	- Cel: utworzenie propozycji dopasowania.
+	- Body: company_TIN, matched_company_TIN, status=pending.
+
+- GET /matches
+	- Cel: lista matchy.
+	- Opcjonalne filtry: company_TIN, matched_company_TIN, status.
+
+- GET /matches/:id
+	- Cel: pobranie szczegolow jednego matcha.
+
+- PATCH /matches/:id/status
+	- Cel: zmiana statusu matcha na accepted/rejected.
+
+- DELETE /matches/:id
+	- Cel: usuniecie matcha.
+
+6) Minimalny zestaw MVP (jezeli chcesz zaczac szybko)
+
+- POST /auth/register
+- POST /auth/login
+- POST /companies
+- GET /companies
+- GET /companies/:tin
+- PATCH /companies/:tin
+- GET /services
+- POST /matches
+- GET /companies/:tin/matches
+- PATCH /matches/:id/status
+
