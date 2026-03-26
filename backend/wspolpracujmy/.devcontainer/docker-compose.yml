@@ -1,19 +1,20 @@
 services:
   api:
     build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: wspolpracujmy-api
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    command: sleep infinity
+    volumes:
+      - ..:/workspace:cached,z
     depends_on:
       - db
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=wspolpracujmy;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=projekt_db;Username=postgres;Password=postgres
     ports:
       - "8080:8080"
   db:
     image: postgres:18
-    container_name: postgres-wspolpracuj.my
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -23,7 +24,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../init.sql:/docker-entrypoint-initdb.d/init.sql:z
 
 volumes:
   postgres_data:
