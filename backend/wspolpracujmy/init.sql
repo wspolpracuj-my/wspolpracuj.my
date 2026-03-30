@@ -10,7 +10,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 -- Create ENUM type for status
-CREATE TYPE status_enum AS ENUM ('pending', 'accepted', 'rejected');
+CREATE TYPE status_enum AS ENUM ('Pending', 'Accepted', 'Rejected');
 
 
 CREATE TABLE "Services" (

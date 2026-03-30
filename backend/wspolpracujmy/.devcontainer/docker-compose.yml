@@ -11,7 +11,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=projekt_db;Username=postgres;Password=postgres
-      ASPNETCORE_URLS: http://+:8080
+ #     ASPNETCORE_URLS: http://+:8080
     ports:
       - "8080:8080"
   db:

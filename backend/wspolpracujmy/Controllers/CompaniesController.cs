@@ -36,23 +36,38 @@ public class CompaniesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(location))
             query = query.Where(c => c.Location != null && EF.Functions.ILike(c.Location, $"%{location}%"));
 
-        var companies = await query
-            .Select(c => new CompanyDto
-            {
-                Tin = c.Tin,
-                Name = c.Name,
-                Description = c.Description,
-                Website = c.Website,
-                ContactEmail = c.ContactEmail,
-                Location = c.Location,
-                CreatedAt = c.CreatedAt,
-                Service = c.Service == null ? null : new ServiceDto { Id = c.Service.Id, Name = c.Service.Name },
-                Offer = c.Offer == null ? null : new ServiceDto { Id = c.Offer.Id, Name = c.Offer.Name },
-                Users = c.Users.Select(u => new UserDto { Id = u.Id, Mail = u.Mail, Verified = u.Verified }).ToList(),
-                MatchesInitiated = c.MatchesInitiated.Select(m => new MatchDto { Id = m.Id, CompanyTin = m.CompanyTin, MatchedCompanyTin = m.MatchedCompanyTin, Status = m.Status.ToString(), CreatedAt = m.CreatedAt }).ToList(),
-                MatchesReceived = c.MatchesReceived.Select(m => new MatchDto { Id = m.Id, CompanyTin = m.CompanyTin, MatchedCompanyTin = m.MatchedCompanyTin, Status = m.Status.ToString(), CreatedAt = m.CreatedAt }).ToList()
-            })
+        var companiesEntities = await query
+            .AsSplitQuery() 
             .ToListAsync();
+
+        var companies = companiesEntities.Select(c => new CompanyDto
+        {
+            Tin = c.Tin,
+            Name = c.Name,
+            Description = c.Description,
+            Website = c.Website,
+            ContactEmail = c.ContactEmail,
+            Location = c.Location,
+            CreatedAt = c.CreatedAt,
+            Service = c.Service == null ? null : new ServiceDto { Id = c.Service.Id, Name = c.Service.Name },
+            Offer = c.Offer == null ? null : new ServiceDto { Id = c.Offer.Id, Name = c.Offer.Name },
+            Users = c.Users.Select(u => new UserDto { Id = u.Id, Mail = u.Mail, Verified = u.Verified }).ToList(),
+            MatchesInitiated = c.MatchesInitiated.Select(m => new MatchDto {
+                Id = m.Id,
+                CompanyTin = m.CompanyTin,
+                MatchedCompanyTin = m.MatchedCompanyTin,
+                Status = m.Status.ToString(),
+                CreatedAt = m.CreatedAt
+            }).ToList(),
+            MatchesReceived = c.MatchesReceived.Select(m => new MatchDto {
+                Id = m.Id,
+                CompanyTin = m.CompanyTin,
+                MatchedCompanyTin = m.MatchedCompanyTin,
+                Status = m.Status.ToString(),
+                CreatedAt = m.CreatedAt
+            }).ToList()
+        })
+        .ToList();
 
         return Ok(companies);
     }
