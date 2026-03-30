@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using wspolpracujmy.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -7,6 +10,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
+// Register EF Core AppDbContext (Postgres)
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -15,9 +22,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    // app.UseHttpsRedirection();
+    // Seed development data (runs only in Development)
+    await app.SeedIfDevelopmentAsync();
 }
 
-app.UseHttpsRedirection();
 
 var summaries = new[]
 {
@@ -37,6 +46,8 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+// app.Urls.Add("http://+:8080");  // Lub builder.WebHost.UseUrls("http://+:8080"); przed Build()
 
 app.Run();
 
