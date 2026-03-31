@@ -11,14 +11,14 @@ public record ServiceDto
 
 public record UserDto
 {
-    public int Id { get; init; }
+    // public int Id { get; init; }
     public string Mail { get; init; } = default!;
     public bool Verified { get; init; }
 }
 
 public record MatchDto
 {
-    public int Id { get; init; }
+    // public int Id { get; init; }
     public string CompanyTin { get; init; } = default!;
     public string MatchedCompanyTin { get; init; } = default!;
     public string Status { get; init; } = default!;
