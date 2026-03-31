@@ -5,7 +5,7 @@ namespace wspolpracujmy.Models;
 
 public record ServiceDto
 {
-    public int Id { get; init; }
+    // public int Id { get; init; }
     public string Name { get; init; } = default!;
 }
 
@@ -36,7 +36,4 @@ public record CompanyDto
     public DateTimeOffset CreatedAt { get; init; }
     public ServiceDto? Service { get; init; }
     public ServiceDto? Offer { get; init; }
-    public List<UserDto> Users { get; init; } = new();
-    public List<MatchDto> MatchesInitiated { get; init; } = new();
-    public List<MatchDto> MatchesReceived { get; init; } = new();
 }
