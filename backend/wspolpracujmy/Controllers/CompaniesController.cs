@@ -93,6 +93,6 @@ public class CompaniesController : ControllerBase
             Offer = company.Offer == null ? null : new ServiceDto { Name = company.Offer.Name },
         };
     
-    return Ok(companies);
+        return Ok(companies);
     }
 }
