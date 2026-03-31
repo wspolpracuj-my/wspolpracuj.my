@@ -2,7 +2,7 @@ namespace wspolpracujmy.Models;
 
 public enum StatusEnum
 {
-    Pending,
-    Accepted,
-    Rejected
+    pending,
+    accepted,
+    rejected
 }

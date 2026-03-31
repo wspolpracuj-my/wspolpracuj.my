@@ -67,7 +67,7 @@ public static class DevDataSeeder
         context.Users.AddRange(user1, user2);
         await context.SaveChangesAsync();
 
-        var match = new Match { CompanyTin = comp1.Tin, MatchedCompanyTin = comp2.Tin, Status = StatusEnum.Pending };
+        var match = new Match { CompanyTin = comp1.Tin, MatchedCompanyTin = comp2.Tin, Status = StatusEnum.pending };
         context.Matches.Add(match);
         await context.SaveChangesAsync();
     }

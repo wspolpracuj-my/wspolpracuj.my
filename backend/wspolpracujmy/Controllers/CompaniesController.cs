@@ -6,7 +6,7 @@ using wspolpracujmy.Models;
 namespace wspolpracujmy.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("companies")]
 public class CompaniesController : ControllerBase
 {
     private readonly AppDbContext _db;

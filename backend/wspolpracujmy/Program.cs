@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,9 @@ builder.Services.AddSwaggerGen();
 
 // Register EF Core AppDbContext (Postgres)
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsqlOptions => npgsqlOptions.MapEnum<StatusEnum>("status_enum")));
 
 var app = builder.Build();
 

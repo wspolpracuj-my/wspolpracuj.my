@@ -21,7 +21,7 @@ public class Match
 
     [Required]
     [Column("status", TypeName = "status_enum")]
-    public StatusEnum Status { get; set; } = StatusEnum.Pending;
+    public StatusEnum Status { get; set; } = StatusEnum.pending;
 
     [Required]
     [Column("created_at")]
