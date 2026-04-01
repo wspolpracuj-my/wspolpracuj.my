@@ -16,6 +16,41 @@ public class MatchesController : ControllerBase
         _db = db;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetMatchesAsync()
+    {
+        var matches = await _db.Matches
+            .OrderByDescending(m => m.CreatedAt)
+            .Select(m => new MatchDto
+            {
+                CompanyTin = m.CompanyTin,
+                MatchedCompanyTin = m.MatchedCompanyTin,
+                Status = m.Status.ToString(),
+                CreatedAt = m.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(matches);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetMatchAsync(int id)
+    {
+        var match = await _db.Matches.FindAsync(id);
+        if (match == null)
+            return NotFound(new { message = "Match not found." });
+
+        var matches = new MatchDto
+        {
+            CompanyTin = match.CompanyTin,
+            MatchedCompanyTin = match.MatchedCompanyTin,
+            Status = match.Status.ToString(),
+            CreatedAt = match.CreatedAt
+        };
+
+        return Ok(matches);
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateMatchAsync([FromBody] CreateMatchRequest request)
     {
