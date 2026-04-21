@@ -3,7 +3,7 @@ CREATE TABLE "Users" (
   "name" varchar NOT NULL,
   "surname" varchar NOT NULL,
   "role" "ENUM(admin,student,company)" NOT NULL,
-  "email" varchar UNIQUE NOT NULL,
+  "login" varchar UNIQUE NOT NULL,
   "password" varchar NOT NULL
 );
 
@@ -18,6 +18,7 @@ CREATE TABLE "Students" (
   "id" integer PRIMARY KEY,
   "user_id" integer UNIQUE NOT NULL,
   "group_id" integer
+  "email" varchar UNIQUE NOT NULL,
 );
 
 CREATE TABLE "Groups" (
