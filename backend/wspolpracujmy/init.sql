@@ -7,7 +7,7 @@ CREATE TABLE "Users" (
   "password" varchar NOT NULL
 );
 
-CREATE TABLE "Company" (
+CREATE TABLE "Companies" (
   "id" integer PRIMARY KEY,
   "user_id" integer UNIQUE NOT NULL,
   "company_name" varchar NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE "Groups" (
   "number" integer
 );
 
-CREATE TABLE "Projects" (
+CREATE TABLE "Project" (
   "id" integer PRIMARY KEY,
   "company_id" integer NOT NULL,
   "topic" varchar NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE "Projects" (
 
 CREATE TABLE "Files" (
   "id" uuid PRIMARY KEY,
-  "user_id" integer,
+  "user_id" integer NOT NULL,
   "original_name" varchar NOT NULL,
   "gcs_bucket" text NOT NULL,
   "gcs_object_name" varchar NOT NULL,
@@ -86,8 +86,9 @@ CREATE TABLE "Tags" (
 );
 
 CREATE TABLE "ProjectTags" (
-  "project_id" integer,
-  "tag_id" integer
+  "project_id" integer NOT NULL,
+  "tag_id" integer NOT NULL
+  PRIMARY KEY ("project_id", "tag_id"),
 );
 
 CREATE TABLE "Notifications" (
@@ -101,15 +102,15 @@ CREATE TABLE "Calendar" (
   "id" integer PRIMARY KEY,
   "time" timestamp,
   "name" varchar,
-  "group_id" integer
+  "group_id" integer NOT NULL
 );
 
-CREATE TABLE "Meeting_type" (
+CREATE TABLE "Meeting_types" (
   "id" integer PRIMARY KEY,
   "type" varchar
 );
 
-ALTER TABLE "Company" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "Companies" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "Students" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
