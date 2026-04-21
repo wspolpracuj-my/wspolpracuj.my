@@ -30,6 +30,17 @@ CREATE TABLE "Groups" (
   "number_of_members" integer NOT NULL
 );
 
+CREATE TABLE "GroupRequests" (
+  "id" integer PRIMARY KEY,
+  "group_id" integer NOT NULL,
+  "student_id" integer NOT NULL,
+  "created_by_user_id" integer NOT NULL,
+  "status" "ENUM(pending,accepted,declined)" NOT NULL,
+  "type" "ENUM(invite,join_request)" NOT NULL,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+  "responded_at" timestamp
+);
+
 CREATE TABLE "Project" (
   "id" integer PRIMARY KEY,
   "company_id" integer NOT NULL,
@@ -145,3 +156,17 @@ ALTER TABLE "ProjectTags" ADD FOREIGN KEY ("tag_id") REFERENCES "Tags" ("id") DE
 ALTER TABLE "Notifications" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "Calendar" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupRequests" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupRequests" ADD FOREIGN KEY ("student_id") REFERENCES "Students" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupRequests" ADD FOREIGN KEY ("created_by_user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+CREATE INDEX idx_comments_project_id ON "Comments" ("project_id");
+
+CREATE INDEX idx_responses_comment_id ON "Responses" ("comment_id");
+
+CREATE INDEX idx_projecttags_project_id ON "ProjectTags" ("project_id");
+
+CREATE INDEX idx_projecttags_tag_id ON "ProjectTags" ("tag_id");
