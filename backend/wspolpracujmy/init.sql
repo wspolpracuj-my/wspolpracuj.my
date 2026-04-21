@@ -1,62 +1,145 @@
--- PostgreSQL 18 Configuration
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
--- Create ENUM type for status
-CREATE TYPE status_enum AS ENUM ('Pending', 'Accepted', 'Rejected');
-
-
-CREATE TABLE "Services" (
-  "id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  "name" varchar NOT NULL
-);
-
-CREATE TABLE "Companies" (
-  "TIN" varchar PRIMARY KEY,
-  "name" varchar NOT NULL,
-  "description" text,
-  "website" varchar,
-  "contact_email" varchar,
-  "service_id" integer,
-  "offer_id" integer,
-  "location" varchar,
-  "created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  CONSTRAINT "fk_companies_service" FOREIGN KEY ("service_id") REFERENCES "Services" ("id") DEFERRABLE INITIALLY IMMEDIATE,
-  CONSTRAINT "fk_companies_offer" FOREIGN KEY ("offer_id") REFERENCES "Services" ("id") DEFERRABLE INITIALLY IMMEDIATE
-);
-
 CREATE TABLE "Users" (
-  "id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  "mail" varchar NOT NULL,
-  "password" varchar NOT NULL,
-  "company_TIN" varchar,
-  "verified" boolean DEFAULT false,
-  CONSTRAINT "fk_users_company" FOREIGN KEY ("company_TIN") REFERENCES "Companies" ("TIN") DEFERRABLE INITIALLY IMMEDIATE
+  "id" integer PRIMARY KEY,
+  "name" varchar NOT NULL,
+  "surname" varchar NOT NULL,
+  "role" "ENUM(admin,student,company)" NOT NULL,
+  "email" varchar UNIQUE NOT NULL,
+  "password" varchar NOT NULL
 );
 
-CREATE TABLE "Matches" (
-  "id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  "company_TIN" varchar NOT NULL,
-  "matched_company_TIN" varchar NOT NULL,
-  "status" status_enum DEFAULT 'pending' NOT NULL,
-  "created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  CONSTRAINT "fk_matches_company" FOREIGN KEY ("company_TIN") REFERENCES "Companies" ("TIN") DEFERRABLE INITIALLY IMMEDIATE,
-  CONSTRAINT "fk_matches_matched_company" FOREIGN KEY ("matched_company_TIN") REFERENCES "Companies" ("TIN") DEFERRABLE INITIALLY IMMEDIATE,
-  CONSTRAINT "ck_matches_different_companies" CHECK ("company_TIN" != "matched_company_TIN")
+CREATE TABLE "Company" (
+  "id" integer PRIMARY KEY,
+  "user_id" integer UNIQUE NOT NULL,
+  "company_name" varchar NOT NULL,
+  "contact_email" varchar
 );
 
--- Create indexes for better query performance
-CREATE INDEX "idx_users_mail" ON "Users" ("mail");
-CREATE INDEX "idx_users_company_tin" ON "Users" ("company_TIN");
-CREATE INDEX "idx_companies_service_id" ON "Companies" ("service_id");
-CREATE INDEX "idx_companies_offer_id" ON "Companies" ("offer_id");
-CREATE INDEX "idx_matches_company_tin" ON "Matches" ("company_TIN");
-CREATE INDEX "idx_matches_matched_company_tin" ON "Matches" ("matched_company_TIN");
-CREATE INDEX "idx_matches_status" ON "Matches" ("status");
+CREATE TABLE "Students" (
+  "id" integer PRIMARY KEY,
+  "user_id" integer UNIQUE NOT NULL,
+  "group_id" integer
+);
+
+CREATE TABLE "Groups" (
+  "id" integer PRIMARY KEY,
+  "name" varchar NOT NULL,
+  "project_id" integer,
+  "is_accepted" "ENUM(pending,accepted,declined)",
+  "leader_id" integer,
+  "number" integer
+);
+
+CREATE TABLE "Projects" (
+  "id" integer PRIMARY KEY,
+  "company_id" integer NOT NULL,
+  "topic" varchar NOT NULL,
+  "description" varchar,
+  "project_goal" varchar,
+  "work_scope" varchar,
+  "needed_technologies" varchar,
+  "created_at" timestamp,
+  "max_groups" integer,
+  "max_number_group_members" integer,
+  "meeting_type_id" integer,
+  "partnership_type" varchar,
+  "language_doc" "ENUM(polish,english)",
+  "notes" varchar,
+  "priority" "ENUM(1,2,3,4,5)"
+);
+
+CREATE TABLE "Files" (
+  "id" uuid PRIMARY KEY,
+  "user_id" integer,
+  "original_name" varchar NOT NULL,
+  "gcs_bucket" text NOT NULL,
+  "gcs_object_name" varchar NOT NULL,
+  "content_type" varchar NOT NULL,
+  "size_bytes" bigint NOT NULL,
+  "created_at" timestamp NOT NULL
+);
+
+CREATE TABLE "GroupFiles" (
+  "group_id" integer,
+  "file_id" uuid
+);
+
+CREATE TABLE "Comments" (
+  "id" integer PRIMARY KEY,
+  "user_id" integer NOT NULL,
+  "project_id" integer,
+  "content" varchar,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP)
+);
+
+CREATE TABLE "Responses" (
+  "id" integer PRIMARY KEY,
+  "comment_id" integer NOT NULL,
+  "user_id" integer NOT NULL,
+  "content" varchar,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP)
+);
+
+CREATE TABLE "Tags" (
+  "id" integer PRIMARY KEY,
+  "name" varchar UNIQUE NOT NULL
+);
+
+CREATE TABLE "ProjectTags" (
+  "project_id" integer,
+  "tag_id" integer
+);
+
+CREATE TABLE "Notifications" (
+  "id" integer PRIMARY KEY,
+  "user_id" integer NOT NULL,
+  "content" varchar,
+  "status" "ENUM(not-read,read)"
+);
+
+CREATE TABLE "Calendar" (
+  "id" integer PRIMARY KEY,
+  "time" timestamp,
+  "name" varchar,
+  "group_id" integer
+);
+
+CREATE TABLE "Meeting_type" (
+  "id" integer PRIMARY KEY,
+  "type" varchar
+);
+
+ALTER TABLE "Company" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Students" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Students" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Groups" ADD FOREIGN KEY ("project_id") REFERENCES "Projects" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Groups" ADD FOREIGN KEY ("leader_id") REFERENCES "Students" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Projects" ADD FOREIGN KEY ("company_id") REFERENCES "Company" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Projects" ADD FOREIGN KEY ("meeting_type_id") REFERENCES "Meeting_type" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Files" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupFiles" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupFiles" ADD FOREIGN KEY ("file_id") REFERENCES "Files" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Comments" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Comments" ADD FOREIGN KEY ("project_id") REFERENCES "Projects" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Responses" ADD FOREIGN KEY ("comment_id") REFERENCES "Comments" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Responses" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "ProjectTags" ADD FOREIGN KEY ("project_id") REFERENCES "Projects" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "ProjectTags" ADD FOREIGN KEY ("tag_id") REFERENCES "Tags" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Notifications" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "Calendar" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
