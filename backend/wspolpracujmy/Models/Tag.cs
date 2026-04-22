@@ -13,8 +13,8 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("name")]
-        public string Name { get; set; }
+        public required string Name { get; set; }
 
-        public ICollection<ProjectTag> ProjectTags { get; set; }
+        public ICollection<ProjectTag> ProjectTags { get; set; } = new List<ProjectTag>();
     }
 }

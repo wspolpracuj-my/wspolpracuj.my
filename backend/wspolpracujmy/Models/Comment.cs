@@ -22,14 +22,14 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("content")]
-        public string Content { get; set; }
+        public required string Content { get; set; }
 
         [Required]
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
-        public User User { get; set; }
-        public Project Project { get; set; }
-        public ICollection<Response> Responses { get; set; }
+        public required User User { get; set; }
+        public required Project Project { get; set; }
+        public ICollection<Response> Responses { get; set; } = new List<Response>();
     }
 }

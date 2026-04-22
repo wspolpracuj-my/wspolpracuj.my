@@ -13,9 +13,7 @@ builder.Services.AddSwaggerGen();
 
 // Register EF Core AppDbContext (Postgres)
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        npgsqlOptions => npgsqlOptions.MapEnum<StatusEnum>("status_enum")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
@@ -28,7 +26,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
     // app.UseHttpsRedirection();
     // Seed development data (runs only in Development)
-    await app.SeedIfDevelopmentAsync();
+    // await app.SeedIfDevelopmentAsync();
 }
 
 

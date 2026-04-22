@@ -15,7 +15,7 @@ namespace wspolpracujmy.Models
         [Column("file_id")]
         public Guid FileId { get; set; }
 
-        public Group Group { get; set; }
-        public FileEntity File { get; set; }
+        public required Group Group { get; set; }
+        public required FileEntity File { get; set; }
     }
 }

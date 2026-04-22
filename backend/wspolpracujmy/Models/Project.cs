@@ -18,19 +18,19 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("topic")]
-        public string Topic { get; set; }
+        public required string Topic { get; set; }
 
         [Column("description")]
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         [Column("project_goal")]
-        public string ProjectGoal { get; set; }
+        public string? ProjectGoal { get; set; }
 
         [Column("work_scope")]
-        public string WorkScope { get; set; }
+        public string? WorkScope { get; set; }
 
         [Column("needed_technologies")]
-        public string NeededTechnologies { get; set; }
+        public string? NeededTechnologies { get; set; }
 
         [Required]
         [Column("created_at")]
@@ -48,23 +48,23 @@ namespace wspolpracujmy.Models
         public int MeetingTypeId { get; set; }
 
         [Column("partnership_type")]
-        public string PartnershipType { get; set; }
+        public string? PartnershipType { get; set; }
 
         [Required]
         [Column("language_doc")]
-        public LanguageDoc LanguageDoc { get; set; }
+        public required LanguageDoc LanguageDoc { get; set; }
 
         [Column("notes")]
-        public string Notes { get; set; }
+        public string? Notes { get; set; }
 
         [Required]
         [Column("priority")]
-        public Priority Priority { get; set; }
+        public required Priority Priority { get; set; }
 
-        public Company Company { get; set; }
-        public MeetingType MeetingType { get; set; }
-        public ICollection<Group> Groups { get; set; }
-        public ICollection<ProjectTag> ProjectTags { get; set; }
-        public ICollection<Comment> Comments { get; set; }
+        public required Company Company { get; set; }
+        public required MeetingType MeetingType { get; set; }
+        public ICollection<Group> Groups { get; set; } = new List<Group>();
+        public ICollection<ProjectTag> ProjectTags { get; set; } = new List<ProjectTag>();
+        public ICollection<Comment> Comments { get; set; } = new List<Comment>();
     }
 }

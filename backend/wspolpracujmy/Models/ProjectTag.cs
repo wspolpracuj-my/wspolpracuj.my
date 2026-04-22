@@ -14,7 +14,7 @@ namespace wspolpracujmy.Models
         [Column("tag_id")]
         public int TagId { get; set; }
 
-        public Project Project { get; set; }
-        public Tag Tag { get; set; }
+        public required Project Project { get; set; }
+        public required Tag Tag { get; set; }
     }
 }

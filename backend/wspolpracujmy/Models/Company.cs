@@ -17,12 +17,12 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("company_name")]
-        public string CompanyName { get; set; }
+        public required string CompanyName { get; set; }
 
         [Column("contact_email")]
-        public string ContactEmail { get; set; }
+        public string? ContactEmail { get; set; }
 
-        public User User { get; set; }
-        public ICollection<Project> Projects { get; set; }
+        public required User User { get; set; }
+        public ICollection<Project> Projects { get; set; } = new List<Project>();
     }
 }

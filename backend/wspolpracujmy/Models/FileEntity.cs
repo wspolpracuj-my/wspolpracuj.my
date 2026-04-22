@@ -17,19 +17,19 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("original_name")]
-        public string OriginalName { get; set; }
+        public required string OriginalName { get; set; }
 
         [Required]
         [Column("gcs_bucket")]
-        public string GcsBucket { get; set; }
+        public required string GcsBucket { get; set; }
 
         [Required]
         [Column("gcs_object_name")]
-        public string GcsObjectName { get; set; }
+        public required string GcsObjectName { get; set; }
 
         [Required]
         [Column("content_type")]
-        public string ContentType { get; set; }
+        public required string ContentType { get; set; }
 
         [Required]
         [Column("size_bytes")]
@@ -39,6 +39,6 @@ namespace wspolpracujmy.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
-        public User User { get; set; }
+        public required User User { get; set; }
     }
 }

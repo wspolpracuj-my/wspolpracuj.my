@@ -12,6 +12,6 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("type")]
-        public string Type { get; set; }
+        public required string Type { get; set; }
     }
 }

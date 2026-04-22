@@ -17,12 +17,12 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("content")]
-        public string Content { get; set; }
+        public required string Content { get; set; }
 
         [Required]
         [Column("status")]
-        public NotificationStatus Status { get; set; }
+        public required NotificationStatus Status { get; set; }
 
-        public User User { get; set; }
+        public required User User { get; set; }
     }
 }

@@ -13,7 +13,7 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("name")]
-        public string Name { get; set; }
+        public required string Name { get; set; }
 
         [Required]
         [Column("project_id")]
@@ -21,7 +21,7 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("is_accepted")]
-        public GroupStatus IsAccepted { get; set; }
+        public required GroupStatus IsAccepted { get; set; }
 
         [Required]
         [Column("leader_id")]
@@ -31,10 +31,10 @@ namespace wspolpracujmy.Models
         [Column("number_of_members")]
         public int NumberOfMembers { get; set; }
 
-        public Project Project { get; set; }
-        public Student Leader { get; set; }
-        public ICollection<Student> Members { get; set; }
-        public ICollection<GroupFile> GroupFiles { get; set; }
-        public ICollection<CalendarEvent> CalendarEvents { get; set; }
+        public required Project Project { get; set; }
+        public required Student Leader { get; set; }
+        public ICollection<Student> Members { get; set; } = new List<Student>();
+        public ICollection<GroupFile> GroupFiles { get; set; } = new List<GroupFile>();
+        public ICollection<CalendarEvent> CalendarEvents { get; set; } = new List<CalendarEvent>();
     }
 }

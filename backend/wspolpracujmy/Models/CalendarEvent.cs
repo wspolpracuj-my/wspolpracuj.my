@@ -15,14 +15,15 @@ namespace wspolpracujmy.Models
         [Column("time")]
         public DateTime Time { get; set; }
 
-        [Required]
-        [Column("name")]
-        public string Name { get; set; }
 
         [Required]
         [Column("group_id")]
         public int GroupId { get; set; }
 
-        public Group Group { get; set; }
+        [Required]
+        [Column("name")]
+        public required string Name { get; set; }
+
+        public required Group Group { get; set; }
     }
 }

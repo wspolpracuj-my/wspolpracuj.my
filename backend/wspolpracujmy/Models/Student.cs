@@ -20,9 +20,9 @@ namespace wspolpracujmy.Models
 
         [Required]
         [Column("email")]
-        public string Email { get; set; }
+        public required string Email { get; set; }
 
-        public User User { get; set; }
-        public Group Group { get; set; }
+        public required User User { get; set; }
+        public required Group Group { get; set; }
     }
 }
