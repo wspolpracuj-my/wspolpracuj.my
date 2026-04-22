@@ -22,6 +22,7 @@ namespace wspolpracujmy.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<CalendarEvent> CalendarEvents { get; set; }
         public DbSet<MeetingType> Meeting_types { get; set; }
+        public DbSet<GroupRequest> GroupRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,6 +41,7 @@ namespace wspolpracujmy.Data
             modelBuilder.Entity<Notification>().ToTable("Notifications");
             modelBuilder.Entity<CalendarEvent>().ToTable("CalendarEvents");
             modelBuilder.Entity<MeetingType>().ToTable("Meeting_types");
+            modelBuilder.Entity<GroupRequest>().ToTable("GroupRequests");
 
             // Composite keys
             modelBuilder.Entity<ProjectTag>()

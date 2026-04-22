@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddSwaggerGen();
 
 // Register EF Core AppDbContext (Postgres)
@@ -24,6 +24,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    await TestDataSeeder.SeedAsync(app);
     // app.UseHttpsRedirection();
     // Seed development data (runs only in Development)
     // await app.SeedIfDevelopmentAsync();

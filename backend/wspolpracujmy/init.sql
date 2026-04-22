@@ -17,7 +17,7 @@ CREATE TABLE "Companies" (
 CREATE TABLE "Students" (
   "id" integer PRIMARY KEY,
   "user_id" integer UNIQUE NOT NULL,
-  "group_id" integer NOT NULL,
+  "group_id" integer,
   "email" varchar UNIQUE NOT NULL
 );
 
@@ -27,7 +27,7 @@ CREATE TABLE "Groups" (
   "project_id" integer NOT NULL,
   "is_accepted" "ENUM(pending,accepted,declined)" NOT NULL,
   "leader_id" integer NOT NULL,
-  "number_of_members" integer NOT NULL
+  -- number_of_members removed; compute on demand from Students table
 );
 
 CREATE TABLE "GroupRequests" (

@@ -14,7 +14,6 @@ namespace wspolpracujmy.Models
         [Column("user_id")]
         public int UserId { get; set; }
 
-        [Required]
         [Column("group_id")]
         public int GroupId { get; set; }
 
