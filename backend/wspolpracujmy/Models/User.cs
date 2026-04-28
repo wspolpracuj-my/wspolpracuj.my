@@ -12,24 +12,27 @@ namespace wspolpracujmy.Models
         public int Id { get; set; }
 
         [Required]
+        [MaxLength(100)]
         [Column("name")]
         public required string Name { get; set; }
 
         [Required]
+        [MaxLength(100)]
         [Column("surname")]
         public required string Surname { get; set; }
 
         [Required]
         [Column("role")]
-        public required Role Role { get; set; }
+        public Role Role { get; set; }
 
         [Required]
+        [MaxLength(100)]
         [Column("login")]
         public required string Login { get; set; }
 
         [Required]
-        [Column("password")]
-        public required string Password { get; set; }
+        [Column("password_hash")]
+        public required string PasswordHash { get; set; }
 
         public Company? Company { get; set; }
         public Student? Student { get; set; }

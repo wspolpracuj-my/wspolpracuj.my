@@ -4,7 +4,7 @@ CREATE TABLE "Users" (
   "surname" varchar NOT NULL,
   "role" "ENUM(admin,student,company)" NOT NULL,
   "login" varchar UNIQUE NOT NULL,
-  "password" varchar NOT NULL
+  "password_hash" varchar NOT NULL
 );
 
 CREATE TABLE "Companies" (

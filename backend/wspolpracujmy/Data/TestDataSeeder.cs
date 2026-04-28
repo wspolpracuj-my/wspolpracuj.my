@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using wspolpracujmy.Models;
+using BCrypt.Net;
 
 namespace wspolpracujmy.Data
 {
@@ -32,12 +33,12 @@ namespace wspolpracujmy.Data
 
             try
             {
-                // Users (companies + students)
-                var u1 = new User { Id = 1, Name = "Krystyna", Surname = "Innowacji", Role = Role.Company, Login = "firma1", Password = "firma1" };
-                var u2 = new User { Id = 2, Name = "Joanna", Surname = "Nieinnowacyjna", Role = Role.Company, Login = "firma2", Password = "firma1" };
-                var u3 = new User { Id = 3, Name = "Student", Surname = "One", Role = Role.Student, Login = "student1", Password = "student1" };
-                var u4 = new User { Id = 4, Name = "Student", Surname = "Two", Role = Role.Student, Login = "student2", Password = "student2" };
-                var u5 = new User { Id = 5, Name = "Student", Surname = "Three", Role = Role.Student, Login = "student3", Password = "student3" };
+                // Users (companies + students) - use BCrypt hash for passwords
+                var u1 = new User { Id = 1, Name = "Krystyna", Surname = "Innowacji", Role = Role.Company, Login = "firma1", PasswordHash = BCrypt.Net.BCrypt.HashPassword("firma1") };
+                var u2 = new User { Id = 2, Name = "Joanna", Surname = "Nieinnowacyjna", Role = Role.Company, Login = "firma2", PasswordHash = BCrypt.Net.BCrypt.HashPassword("firma2") };
+                var u3 = new User { Id = 3, Name = "Student", Surname = "One", Role = Role.Student, Login = "student1", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student1") };
+                var u4 = new User { Id = 4, Name = "Student", Surname = "Two", Role = Role.Student, Login = "student2", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student2") };
+                var u5 = new User { Id = 5, Name = "Student", Surname = "Three", Role = Role.Student, Login = "student3", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student3") };
                 await context.Users.AddRangeAsync(u1, u2, u3, u4, u5);
 
                 // Companies
