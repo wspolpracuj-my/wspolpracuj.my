@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,16 @@ namespace wspolpracujmy.Controllers
             var g = await _db.Groups.Include(x => x.Members).FirstOrDefaultAsync(x => x.Id == id);
             if (g == null) return NotFound();
             return g;
+        }
+
+        [HttpGet("project/{projectId}")]
+        public async Task<ActionResult<IEnumerable<Group>>> GetByProjectId(int projectId)
+        {
+            var groups = await _db.Groups
+                .Include(g => g.Members)
+                .Where(g => g.ProjectId == projectId)
+                .ToListAsync();
+            return groups;
         }
 
         [HttpPost]

@@ -90,10 +90,78 @@
 </div>
 
 <script>
+const API_BASE = "http://localhost:8081/api";
+
 function toggle() {
     document.getElementById("login").classList.toggle("hidden");
     document.getElementById("register").classList.toggle("hidden");
 }
+
+// Obsługa logowania
+document.querySelector("#login form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const login = e.target.querySelector('input[type="text"]').value;
+    const password = e.target.querySelector('input[type="password"]').value;
+
+    try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ login, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data));
+            
+            if (data.role === "Company") {
+                window.location.href = "firma.html";
+            } else {
+                alert("Panel studenta niedostępny");
+            }
+        } else {
+            alert(data.message || "Błąd logowania");
+        }
+    } catch (err) {
+        alert("Nie można połączyć z serwerem");
+    }
+});
+
+// Obsługa rejestracji
+document.querySelector("#register form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const inputs = e.target.querySelectorAll("input");
+    const data = {
+        name: inputs[0].value,
+        surname: inputs[1].value,
+        login: inputs[2].value,
+        email: inputs[3].value,
+        password: inputs[4].value,
+        role: "Company"
+    };
+
+    try {
+        const res = await fetch(`${API_BASE}/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+
+        const result = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem("token", result.token);
+            localStorage.setItem("user", JSON.stringify(result));
+            window.location.href = "firma.html";
+        } else {
+            alert(result.message || "Błąd rejestracji");
+        }
+    } catch (err) {
+        alert("Nie można połączyć z serwerem");
+    }
+});
 </script>
 
 </body>

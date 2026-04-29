@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
@@ -23,6 +24,15 @@ namespace wspolpracujmy.Controllers
             var p = await _db.Projects.FindAsync(id);
             if (p == null) return NotFound();
             return p;
+        }
+
+        [HttpGet("company/{companyId}")]
+        public async Task<ActionResult<IEnumerable<Project>>> GetByCompanyId(int companyId)
+        {
+            var projects = await _db.Projects
+                .Where(p => p.CompanyId == companyId)
+                .ToListAsync();
+            return projects;
         }
 
         [HttpPost]

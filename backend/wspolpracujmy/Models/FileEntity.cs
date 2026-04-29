@@ -15,6 +15,9 @@ namespace wspolpracujmy.Models
         [Column("user_id")]
         public int UserId { get; set; }
 
+        [Column("group_id")]
+        public int? GroupId { get; set; }
+
         [Required]
         [Column("original_name")]
         public required string OriginalName { get; set; }

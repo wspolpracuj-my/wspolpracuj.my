@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
@@ -23,6 +24,16 @@ namespace wspolpracujmy.Controllers
             var n = await _db.Notifications.FindAsync(id);
             if (n == null) return NotFound();
             return n;
+        }
+
+        [HttpGet("user/{userId}")]
+        public async Task<ActionResult<IEnumerable<Notification>>> GetByUserId(int userId)
+        {
+            var notifications = await _db.Notifications
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.Id)
+                .ToListAsync();
+            return notifications;
         }
 
         [HttpPost]

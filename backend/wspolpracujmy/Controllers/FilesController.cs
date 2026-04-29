@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
@@ -24,6 +25,15 @@ namespace wspolpracujmy.Controllers
             var f = await _db.Files.FindAsync(id);
             if (f == null) return NotFound();
             return f;
+        }
+
+        [HttpGet("group/{groupId}")]
+        public async Task<ActionResult<IEnumerable<FileEntity>>> GetByGroupId(int groupId)
+        {
+            var files = await _db.Files
+                .Where(f => f.GroupId == groupId)
+                .ToListAsync();
+            return files;
         }
 
         [HttpPost]

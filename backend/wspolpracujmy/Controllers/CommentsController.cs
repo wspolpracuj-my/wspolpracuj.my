@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
@@ -23,6 +24,16 @@ namespace wspolpracujmy.Controllers
             var c = await _db.Comments.FindAsync(id);
             if (c == null) return NotFound();
             return c;
+        }
+
+        [HttpGet("project/{projectId}")]
+        public async Task<ActionResult<IEnumerable<Comment>>> GetByProjectId(int projectId)
+        {
+            var comments = await _db.Comments
+                .Include(c => c.User)
+                .Where(c => c.ProjectId == projectId)
+                .ToListAsync();
+            return comments;
         }
 
         [HttpPost]
