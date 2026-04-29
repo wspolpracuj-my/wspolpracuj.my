@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel firmy - wspolpracuj.my</title>
+    <link rel="stylesheet" href="firma.css">
+</head>
+<body>
+
+<div class="app">
+    <main class="content">
+
+        <header class="topbar">
+            <div class="brand">
+                <h2 class="logo">wspolpracuj.my</h2>
+                <p class="account-type">Panel firmy</p>
+            </div>
+
+            <div class="welcome-box">
+                <p class="small-label">Panel po zalogowaniu</p>
+                <h1>Cześć<span id="companyName"></span></h1>
+            </div>
+
+            <button class="logout-btn" onclick="logout()">Wyloguj</button>
+        </header>
+
+        <section id="dashboard" class="view active-view">
+            <div class="section-title-row">
+                <div>
+                    <h2>Po zalogowaniu jako firma</h2>
+                    <p class="muted">Skrótowy podgląd najważniejszych informacji.</p>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <button onclick="showView('projects')">Twoje projekty</button>
+                <button onclick="showView('notifications')">Powiadomienia</button>
+                <button onclick="showCreateProject()">Stwórz projekt</button>
+            </div>
+
+            <div class="grid two-columns">
+                <div class="card">
+                    <h3>Twoje projekty</h3>
+                    <p class="muted">Ostatnie 3 projekty wystawione przez firmę.</p>
+                    <div id="dashboardProjects" class="project-list compact-list"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Powiadomienia</h3>
+                    <p class="muted">Najnowsze powiadomienia dotyczące Twojej firmy.</p>
+                    <div id="dashboardNotifications" class="notification-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="projects" class="view">
+            <button class="back-btn" onclick="goHome()">← Wróć</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Twoje projekty</h2>
+                    <p class="muted">Pełna lista projektów danej firmy, od najnowszych.</p>
+                </div>
+
+                <button class="small-primary" onclick="showCreateProject()">+ Stwórz projekt</button>
+            </div>
+
+            <div id="allProjects" class="project-list scroll-list"></div>
+        </section>
+
+        <section id="notifications" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Powiadomienia</h2>
+                    <p class="muted">Powiadomienia są tylko tekstowe i dotyczą wyłącznie tej firmy.</p>
+                </div>
+            </div>
+
+            <div id="allNotifications" class="notification-list card"></div>
+        </section>
+
+        <section id="createProject" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Stwórz projekt</h2>
+                    <p class="muted">Uzupełnij formularz tworzenia projektu.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="createProject(event)">
+                <label>
+                    Kto zleca
+                    <input id="newCompanyName" type="text" readonly>
+                </label>
+
+                <label>
+                    Temat
+                    <input id="newTopic" type="text">
+                </label>
+
+                <label>
+                    Opis
+                    <textarea id="newDescription"></textarea>
+                </label>
+
+                <label>
+                    Cel projektu
+                    <textarea id="newGoal"></textarea>
+                </label>
+
+                <label>
+                    Zakres pracy
+                    <textarea id="newWorkScope"></textarea>
+                </label>
+
+                <label>
+                    Wymagane zasoby technologiczne
+                    <textarea id="newTechResources"></textarea>
+                </label>
+
+                <label>
+                    Email kontaktowy
+                    <input id="newContactEmail" type="email">
+                </label>
+
+                <div class="form-row">
+                    <label>
+                        Data zgłoszenia
+                        <input id="newSubmissionDate" type="date">
+                    </label>
+
+                    <label>
+                        Ile zespołów do realizacji
+                        <input id="newTeamSlots" type="number" min="1">
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <label>
+                        Minimalna liczba członków w zespole
+                        <input id="newMinMembers" type="number" min="1" value="3">
+                    </label>
+
+                    <label>
+                        Maksymalna liczba członków w zespole
+                        <input id="newMaxMembers" type="number" min="1" value="5">
+                    </label>
+                </div>
+
+                <label>
+                    Preferowany typ spotkań
+                    <select id="newMeetingTypes">
+                        <option value="">Wybierz typ spotkań</option>
+                        <option value="Online">Online</option>
+                        <option value="Stacjonarne">Stacjonarne</option>
+                        <option value="Hybrydowe">Hybrydowe</option>
+                    </select>
+                </label>
+
+                <label>
+                    Planowany tryb współpracy
+                    <select id="newCooperationModes">
+                        <option value="">Wybierz tryb współpracy</option>
+                        <option value="Zdalny">Zdalny</option>
+                        <option value="Stacjonarny">Stacjonarny</option>
+                        <option value="Hybrydowy">Hybrydowy</option>
+                        <option value="Asynchroniczny">Asynchroniczny</option>
+                    </select>
+                </label>
+
+                <label>
+                    Język dokumentacji
+                    <select id="newDocumentationLanguages">
+                        <option value="">Wybierz język dokumentacji</option>
+                        <option value="Polski">Polski</option>
+                        <option value="Angielski">Angielski</option>
+                        <option value="Inny">Inny</option>
+                    </select>
+                </label>
+
+                <label>
+                    Dodatkowe uwagi
+                    <textarea id="newAdditionalNotes"></textarea>
+                </label>
+
+                <label>
+                    Tagi
+                    <select id="newTags"></select>
+                </label>
+
+                <label>
+                    Priorytet
+                    <select id="newPriority">
+                        <option value="">Wybierz priorytet</option>
+                        <option value="1">1 - bardzo niski</option>
+                        <option value="2">2 - niski</option>
+                        <option value="3">3 - średni</option>
+                        <option value="4">4 - wysoki</option>
+                        <option value="5">5 - bardzo wysoki</option>
+                    </select>
+                </label>
+
+                <button type="submit">Stwórz projekt</button>
+                <p id="createMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="projectDetails" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Konkretny projekt</p>
+                    <h2 id="detailsTitle"></h2>
+                    <p id="detailsFill" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="quick-actions project-tabs">
+                <button onclick="showEditProject()">Edytuj projekt</button>
+                <button onclick="showProjectComments()">Komentarze</button>
+                <button onclick="showProjectTeams()">Zespoły</button>
+            </div>
+
+            <div class="card details-card">
+                <h3>Opis</h3>
+                <p id="detailsDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="detailsGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="detailsWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="detailsTechResources"></p>
+
+                <h3>Dane projektu</h3>
+                <div class="info-grid">
+                    <div>
+                        <span>Kto zleca</span>
+                        <strong id="detailsCompany"></strong>
+                    </div>
+
+                    <div>
+                        <span>Data zgłoszenia</span>
+                        <strong id="detailsSubmissionDate"></strong>
+                    </div>
+
+                    <div>
+                        <span>Zespoły</span>
+                        <strong id="detailsTeams"></strong>
+                    </div>
+
+                    <div>
+                        <span>Liczba członków</span>
+                        <strong id="detailsMembersRange"></strong>
+                    </div>
+
+                    <div>
+                        <span>Priorytet</span>
+                        <strong id="detailsPriority"></strong>
+                    </div>
+
+                    <div>
+                        <span>Email kontaktowy</span>
+                        <strong id="detailsContact"></strong>
+                    </div>
+                </div>
+
+                <h3>Preferowany typ spotkań</h3>
+                <p id="detailsMeetingTypes"></p>
+
+                <h3>Planowany tryb współpracy</h3>
+                <p id="detailsCooperationModes"></p>
+
+                <h3>Język dokumentacji</h3>
+                <p id="detailsDocumentationLanguages"></p>
+
+                <h3>Tagi</h3>
+                <div id="detailsTags" class="selected-tags"></div>
+
+                <h3>Dodatkowe uwagi</h3>
+                <p id="detailsAdditionalNotes"></p>
+            </div>
+        </section>
+
+        <section id="editProject" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Edytuj projekt</h2>
+                    <p class="muted">Można edytować wszystkie pola oprócz tematu.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="confirmEditProject(event)">
+                <label>
+                    Kto zleca
+                    <input id="editCompanyName" type="text" readonly>
+                </label>
+
+                <label>
+                    Temat
+                    <input id="editTopic" type="text" disabled>
+                </label>
+
+                <label>
+                    Opis
+                    <textarea id="editDescription"></textarea>
+                </label>
+
+                <label>
+                    Cel projektu
+                    <textarea id="editGoal"></textarea>
+                </label>
+
+                <label>
+                    Zakres pracy
+                    <textarea id="editWorkScope"></textarea>
+                </label>
+
+                <label>
+                    Wymagane zasoby technologiczne
+                    <textarea id="editTechResources"></textarea>
+                </label>
+
+                <label>
+                    Email kontaktowy
+                    <input id="editContactEmail" type="email">
+                </label>
+
+                <div class="form-row">
+                    <label>
+                        Data zgłoszenia
+                        <input id="editSubmissionDate" type="date">
+                    </label>
+
+                    <label>
+                        Ile zespołów do realizacji
+                        <input id="editTeamSlots" type="number" min="1">
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <label>
+                        Minimalna liczba członków w zespole
+                        <input id="editMinMembers" type="number" min="1">
+                    </label>
+
+                    <label>
+                        Maksymalna liczba członków w zespole
+                        <input id="editMaxMembers" type="number" min="1">
+                    </label>
+                </div>
+
+                <label>
+                    Preferowany typ spotkań
+                    <select id="editMeetingTypes">
+                        <option value="">Wybierz typ spotkań</option>
+                        <option value="Online">Online</option>
+                        <option value="Stacjonarne">Stacjonarne</option>
+                        <option value="Hybrydowe">Hybrydowe</option>
+                    </select>
+                </label>
+
+                <label>
+                    Planowany tryb współpracy
+                    <select id="editCooperationModes">
+                        <option value="">Wybierz tryb współpracy</option>
+                        <option value="Zdalny">Zdalny</option>
+                        <option value="Stacjonarny">Stacjonarny</option>
+                        <option value="Hybrydowy">Hybrydowy</option>
+                        <option value="Asynchroniczny">Asynchroniczny</option>
+                    </select>
+                </label>
+
+                <label>
+                    Język dokumentacji
+                    <select id="editDocumentationLanguages">
+                        <option value="">Wybierz język dokumentacji</option>
+                        <option value="Polski">Polski</option>
+                        <option value="Angielski">Angielski</option>
+                        <option value="Inny">Inny</option>
+                    </select>
+                </label>
+
+                <label>
+                    Dodatkowe uwagi
+                    <textarea id="editAdditionalNotes"></textarea>
+                </label>
+
+                <label>
+                    Tagi
+                    <select id="editTags"></select>
+                </label>
+
+                <label>
+                    Priorytet
+                    <select id="editPriority">
+                        <option value="">Wybierz priorytet</option>
+                        <option value="1">1 - bardzo niski</option>
+                        <option value="2">2 - niski</option>
+                        <option value="3">3 - średni</option>
+                        <option value="4">4 - wysoki</option>
+                        <option value="5">5 - bardzo wysoki</option>
+                    </select>
+                </label>
+
+                <button type="submit">Potwierdź</button>
+                <p id="editMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="comments" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Komentarze</h2>
+                    <p class="muted">Firma widzi komentarze wszystkich zespołów.</p>
+                </div>
+            </div>
+
+            <div id="commentsList" class="card comment-list"></div>
+        </section>
+
+        <section id="teams" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Zespoły</h2>
+                    <p class="muted">Lista zespołów zgłoszonych do danego projektu, od najnowszych.</p>
+                </div>
+            </div>
+
+            <div id="teamsList" class="team-list scroll-list"></div>
+        </section>
+
+        <section id="teamDetails" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Okno zespołu</p>
+                    <h2 id="teamName"></h2>
+                    <p id="teamProject" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="card details-card">
+                <h3>Członkowie zespołu</h3>
+                <ol id="teamMembers" class="members-list"></ol>
+
+                <button id="repositoryButton" class="small-primary hidden" onclick="showRepository()">Repozytorium</button>
+            </div>
+        </section>
+
+        <section id="repository" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Okno repozytorium</p>
+                    <h2>Repozytorium</h2>
+                    <p class="muted">Miejsce na pliki związane z projektem zaakceptowanego zespołu.</p>
+                </div>
+            </div>
+
+            <div class="card repository-box">
+                <h3>Pliki</h3>
+
+                <div class="upload-area">
+                    <p>Wybierz pliki z dysku.</p>
+                    <input type="file" multiple>
+                </div>
+
+                <ul id="repositoryFiles" class="file-list"></ul>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+let companyData = {
+    id: null,
+    name: "",
+    contactEmail: ""
+};
+
+let currentProjectId = null;
+let currentTeamId = null;
+
+const viewHistory = [];
+
+let projects = [];
+let notifications = [];
+let teams = [];
+let comments = [];
+let repositoryFiles = [];
+
+const availableTags = [
+    "IT",
+    "Proof of Concept",
+    "Badawcze",
+    "Analityka danych",
+    "UX/UI Design",
+    "Aplikacja webowa",
+    "Aplikacja mobilna",
+    "Backend",
+    "Frontend",
+    "Fullstack",
+    "Bazy danych",
+    "Sztuczna inteligencja",
+    "Machine Learning",
+    "Automatyzacja",
+    "IoT",
+    "Embedded Systems",
+    "Cyberbezpieczeństwo",
+    "Testowanie oprogramowania",
+    "DevOps",
+    "Cloud",
+    "Integracje API",
+    "E-commerce",
+    "System zarządzania",
+    "Dashboard / raportowanie",
+    "Edukacja",
+    "Medycyna / HealthTech",
+    "Finanse / FinTech",
+    "Logistyka",
+    "Produkcja / przemysł",
+];
+
+const priorityLabels = {
+    1: "1 - bardzo niski",
+    2: "2 - niski",
+    3: "3 - średni",
+    4: "4 - wysoki",
+    5: "5 - bardzo wysoki"
+};
+
+function loadInitialData() {
+    setCompanyData(companyData);
+    renderTagOptions("newTags");
+    renderTagOptions("editTags");
+    renderProjects();
+    renderNotifications();
+}
+
+async function saveProjectToBackend(projectData) {
+    return projectData;
+}
+
+async function updateProjectInBackend(projectData) {
+    return projectData;
+}
+
+function setCompanyData(data) {
+    companyData = data || {
+        id: null,
+        name: "",
+        contactEmail: ""
+    };
+
+    const companyNameElement = document.getElementById("companyName");
+    const newCompanyName = document.getElementById("newCompanyName");
+
+    if (companyData.name) {
+        companyNameElement.textContent = `, ${companyData.name}`;
+        newCompanyName.value = companyData.name;
+    } else {
+        companyNameElement.textContent = "";
+        newCompanyName.value = "";
+    }
+
+    document.getElementById("newContactEmail").value = companyData.contactEmail || "";
+}
+
+function showView(viewId, saveHistory = true) {
+    const currentView = document.querySelector(".active-view");
+
+    if (currentView && saveHistory && currentView.id !== viewId) {
+        viewHistory.push(currentView.id);
+    }
+
+    document.querySelectorAll(".view").forEach(view => {
+        view.classList.remove("active-view");
+    });
+
+    document.getElementById(viewId).classList.add("active-view");
+}
+
+function goBack() {
+    const previousView = viewHistory.pop();
+
+    if (previousView) {
+        showView(previousView, false);
+    } else {
+        showView("dashboard", false);
+    }
+}
+
+function goHome() {
+    viewHistory.length = 0;
+    showView("dashboard", false);
+}
+
+function renderProjects() {
+    const dashboardProjects = document.getElementById("dashboardProjects");
+    const allProjects = document.getElementById("allProjects");
+
+    dashboardProjects.innerHTML = "";
+    allProjects.innerHTML = "";
+
+    if (projects.length === 0) {
+        dashboardProjects.innerHTML = "<p class='empty-state'>Brak projektów do wyświetlenia.</p>";
+        allProjects.innerHTML = "<div class='card'><p class='empty-state'>Brak projektów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    projects.slice(0, 3).forEach(project => {
+        dashboardProjects.appendChild(createProjectCard(project));
+    });
+
+    projects.forEach(project => {
+        allProjects.appendChild(createProjectCard(project));
+    });
+}
+
+function createProjectCard(project) {
+    const card = document.createElement("button");
+    card.className = "project-card";
+    card.onclick = () => showProjectDetails(project.id);
+
+    const acceptedTeams = project.acceptedTeams || 0;
+    const teamSlots = project.teamSlots || 0;
+
+    card.innerHTML = `
+        <div>
+            <strong>${escapeHtml(project.topic)}</strong>
+            <span>${formatArray(project.tags)}</span>
+        </div>
+        <p>${acceptedTeams}/${teamSlots}</p>
+    `;
+
+    return card;
+}
+
+function renderNotifications() {
+    const dashboardNotifications = document.getElementById("dashboardNotifications");
+    const allNotifications = document.getElementById("allNotifications");
+
+    dashboardNotifications.innerHTML = "";
+    allNotifications.innerHTML = "";
+
+    if (notifications.length === 0) {
+        dashboardNotifications.innerHTML = "<p class='empty-state'>Brak powiadomień do wyświetlenia.</p>";
+        allNotifications.innerHTML = "<p class='empty-state'>Brak powiadomień do wyświetlenia.</p>";
+        return;
+    }
+
+    notifications.slice(0, 3).forEach(notification => {
+        dashboardNotifications.appendChild(createNotification(notification));
+    });
+
+    notifications.forEach(notification => {
+        allNotifications.appendChild(createNotification(notification));
+    });
+}
+
+function createNotification(notification) {
+    const item = document.createElement("div");
+    item.className = "notification-item";
+    item.textContent = notification.text || "";
+    return item;
+}
+
+function showCreateProject() {
+    document.getElementById("createMessage").textContent = "";
+    document.getElementById("newCompanyName").value = companyData.name || "";
+    document.getElementById("newContactEmail").value = companyData.contactEmail || "";
+    document.getElementById("newSubmissionDate").value = getTodayDate();
+    showView("createProject");
+}
+
+async function createProject(event) {
+    event.preventDefault();
+
+    const projectData = collectProjectFormData("new");
+    const validationMessage = validateProjectData(projectData);
+
+    if (validationMessage) {
+        const message = document.getElementById("createMessage");
+        message.textContent = validationMessage;
+        message.className = "form-message error";
+        return;
+    }
+
+    const savedProject = await saveProjectToBackend(projectData);
+
+    projects.unshift({
+        ...savedProject,
+        id: savedProject.id || Date.now(),
+        acceptedTeams: savedProject.acceptedTeams || 0
+    });
+
+    event.target.reset();
+
+    clearSelectedOptions("newMeetingTypes");
+    clearSelectedOptions("newCooperationModes");
+    clearSelectedOptions("newDocumentationLanguages");
+    clearSelectedOptions("newTags");
+
+    renderProjects();
+    showView("dashboard");
+}
+
+function collectProjectFormData(prefix) {
+    const isEdit = prefix === "edit";
+
+    const getValue = id => document.getElementById(id).value.trim();
+    const getNumber = id => Number(document.getElementById(id).value);
+
+    return {
+        id: isEdit ? currentProjectId : null,
+        companyId: companyData.id,
+        companyName: getValue(`${prefix}CompanyName`),
+        topic: getValue(`${prefix}Topic`),
+        description: getValue(`${prefix}Description`),
+        goal: getValue(`${prefix}Goal`),
+        workScope: getValue(`${prefix}WorkScope`),
+        techResources: getValue(`${prefix}TechResources`),
+        contactEmail: getValue(`${prefix}ContactEmail`),
+        submissionDate: getValue(`${prefix}SubmissionDate`),
+        teamSlots: getNumber(`${prefix}TeamSlots`),
+        minMembers: getNumber(`${prefix}MinMembers`),
+        maxMembers: getNumber(`${prefix}MaxMembers`),
+        meetingTypes: getSelectedOptions(`${prefix}MeetingTypes`),
+        cooperationModes: getSelectedOptions(`${prefix}CooperationModes`),
+        documentationLanguages: getSelectedOptions(`${prefix}DocumentationLanguages`),
+        additionalNotes: getValue(`${prefix}AdditionalNotes`),
+        tags: getSelectedOptions(`${prefix}Tags`),
+        priority: Number(document.getElementById(`${prefix}Priority`).value)
+    };
+}
+
+function validateProjectData(projectData) {
+    if (
+        !projectData.companyName ||
+        !projectData.topic ||
+        !projectData.description ||
+        !projectData.goal ||
+        !projectData.workScope ||
+        !projectData.techResources ||
+        !projectData.contactEmail ||
+        !projectData.submissionDate ||
+        !projectData.teamSlots ||
+        !projectData.minMembers ||
+        !projectData.maxMembers ||
+        projectData.meetingTypes.length === 0 ||
+        projectData.cooperationModes.length === 0 ||
+        projectData.documentationLanguages.length === 0 ||
+        projectData.tags.length === 0 ||
+        !projectData.priority
+    ) {
+        return "Nie utworzono projektu prawidłowo. Uzupełnij wszystkie wymagane pola i wybierz wymagane opcje z list.";
+    }
+
+    if (!isValidEmail(projectData.contactEmail)) {
+        return "Podaj poprawny adres email kontaktowy.";
+    }
+
+    if (projectData.minMembers > projectData.maxMembers) {
+        return "Minimalna liczba członków zespołu nie może być większa od maksymalnej.";
+    }
+
+    return "";
+}
+
+function showProjectDetails(projectId) {
+    currentProjectId = projectId;
+
+    const project = projects.find(item => item.id === projectId);
+
+    if (!project) {
+        return;
+    }
+
+    const acceptedTeams = project.acceptedTeams || 0;
+    const teamSlots = project.teamSlots || 0;
+
+    document.getElementById("detailsTitle").textContent = project.topic || "";
+    document.getElementById("detailsFill").textContent = `Zapełnienie projektu: ${acceptedTeams}/${teamSlots}`;
+    document.getElementById("detailsDescription").textContent = project.description || "";
+    document.getElementById("detailsGoal").textContent = project.goal || "";
+    document.getElementById("detailsWorkScope").textContent = project.workScope || "";
+    document.getElementById("detailsTechResources").textContent = project.techResources || "";
+    document.getElementById("detailsCompany").textContent = project.companyName || "";
+    document.getElementById("detailsSubmissionDate").textContent = project.submissionDate || "";
+    document.getElementById("detailsTeams").textContent = `${acceptedTeams}/${teamSlots}`;
+    document.getElementById("detailsMembersRange").textContent = `${project.minMembers || ""} - ${project.maxMembers || ""}`;
+    document.getElementById("detailsPriority").textContent = priorityLabels[project.priority] || "";
+    document.getElementById("detailsContact").textContent = project.contactEmail || "";
+    document.getElementById("detailsMeetingTypes").textContent = formatArray(project.meetingTypes);
+    document.getElementById("detailsCooperationModes").textContent = formatArray(project.cooperationModes);
+    document.getElementById("detailsDocumentationLanguages").textContent = formatArray(project.documentationLanguages);
+    document.getElementById("detailsAdditionalNotes").textContent = project.additionalNotes || "";
+
+    renderSelectedTags(project.tags || []);
+
+    showView("projectDetails");
+}
+
+function renderSelectedTags(tags) {
+    const container = document.getElementById("detailsTags");
+
+    container.innerHTML = "";
+
+    if (!tags || tags.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak tagów.</p>";
+        return;
+    }
+
+    tags.forEach(tag => {
+        const span = document.createElement("span");
+        span.textContent = tag;
+        container.appendChild(span);
+    });
+}
+
+function showEditProject() {
+    const project = projects.find(item => item.id === currentProjectId);
+
+    if (!project) {
+        return;
+    }
+
+    document.getElementById("editCompanyName").value = project.companyName || "";
+    document.getElementById("editTopic").value = project.topic || "";
+    document.getElementById("editDescription").value = project.description || "";
+    document.getElementById("editGoal").value = project.goal || "";
+    document.getElementById("editWorkScope").value = project.workScope || "";
+    document.getElementById("editTechResources").value = project.techResources || "";
+    document.getElementById("editContactEmail").value = project.contactEmail || "";
+    document.getElementById("editSubmissionDate").value = project.submissionDate || "";
+    document.getElementById("editTeamSlots").value = project.teamSlots || "";
+    document.getElementById("editMinMembers").value = project.minMembers || "";
+    document.getElementById("editMaxMembers").value = project.maxMembers || "";
+    document.getElementById("editAdditionalNotes").value = project.additionalNotes || "";
+    document.getElementById("editPriority").value = project.priority || "";
+    document.getElementById("editMessage").textContent = "";
+
+    setSelectedOptions("editMeetingTypes", project.meetingTypes || []);
+    setSelectedOptions("editCooperationModes", project.cooperationModes || []);
+    setSelectedOptions("editDocumentationLanguages", project.documentationLanguages || []);
+    setSelectedOptions("editTags", project.tags || []);
+
+    showView("editProject");
+}
+
+async function confirmEditProject(event) {
+    event.preventDefault();
+
+    const projectData = collectProjectFormData("edit");
+    const validationMessage = validateProjectData(projectData);
+
+    if (validationMessage) {
+        const message = document.getElementById("editMessage");
+        message.textContent = validationMessage;
+        message.className = "form-message error";
+        return;
+    }
+
+    const updatedProject = await updateProjectInBackend(projectData);
+    const projectIndex = projects.findIndex(item => item.id === currentProjectId);
+
+    if (projectIndex !== -1) {
+        projects[projectIndex] = {
+            ...projects[projectIndex],
+            ...updatedProject
+        };
+    }
+
+    renderProjects();
+    showProjectDetails(currentProjectId);
+}
+
+function showProjectComments() {
+    const commentsList = document.getElementById("commentsList");
+    const projectComments = comments.filter(comment => comment.projectId === currentProjectId);
+
+    commentsList.innerHTML = "";
+
+    if (projectComments.length === 0) {
+        commentsList.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
+    } else {
+        projectComments.forEach(comment => {
+            const item = document.createElement("div");
+            item.className = "comment-item";
+            item.innerHTML = `
+                <strong>${escapeHtml(comment.authorName || "")}</strong>
+                <p>${escapeHtml(comment.text || "")}</p>
+            `;
+
+            commentsList.appendChild(item);
+        });
+    }
+
+    showView("comments");
+}
+
+function showProjectTeams() {
+    const teamsList = document.getElementById("teamsList");
+    const projectTeams = teams.filter(team => {
+        return team.projectId === currentProjectId && team.status !== "rejected";
+    });
+
+    teamsList.innerHTML = "";
+
+    if (projectTeams.length === 0) {
+        teamsList.innerHTML = "<div class='card'><p class='empty-state'>Brak zespołów dla tego projektu.</p></div>";
+    } else {
+        projectTeams.forEach(team => {
+            teamsList.appendChild(createTeamCard(team));
+        });
+    }
+
+    showView("teams");
+}
+
+function createTeamCard(team) {
+    const card = document.createElement("div");
+    card.className = "team-card";
+
+    const statusText = getTeamStatusText(team.status);
+
+    card.innerHTML = `
+        <div onclick="showTeamDetails(${team.id})" class="team-main">
+            <strong>${escapeHtml(team.name || "")}</strong>
+            <span>${statusText}</span>
+        </div>
+
+        <div class="team-actions">
+            ${team.status === "pending" ? `
+                <button onclick="acceptTeam(${team.id})">Akceptuj</button>
+                <button class="danger" onclick="rejectTeam(${team.id})">Odrzuć</button>
+            ` : ""}
+        </div>
+    `;
+
+    return card;
+}
+
+function getTeamStatusText(status) {
+    if (status === "accepted") {
+        return "Zaakceptowany";
+    }
+
+    if (status === "rejected") {
+        return "Odrzucony";
+    }
+
+    return "Nie podjęto decyzji";
+}
+
+function acceptTeam(teamId) {
+    const team = teams.find(item => item.id === teamId);
+
+    if (!team) {
+        return;
+    }
+
+    const project = projects.find(item => item.id === team.projectId);
+
+    if (!project) {
+        return;
+    }
+
+    if ((project.acceptedTeams || 0) < project.teamSlots) {
+        team.status = "accepted";
+        project.acceptedTeams = (project.acceptedTeams || 0) + 1;
+    }
+
+    renderProjects();
+    showProjectTeams();
+}
+
+function rejectTeam(teamId) {
+    const team = teams.find(item => item.id === teamId);
+
+    if (!team) {
+        return;
+    }
+
+    team.status = "rejected";
+
+    showProjectTeams();
+}
+
+function showTeamDetails(teamId) {
+    currentTeamId = teamId;
+
+    const team = teams.find(item => item.id === teamId);
+
+    if (!team) {
+        return;
+    }
+
+    const project = projects.find(item => item.id === team.projectId);
+
+    if (!project) {
+        return;
+    }
+
+    document.getElementById("teamName").textContent = team.name || "";
+    document.getElementById("teamProject").textContent = `Przypisany projekt: ${project.topic || ""}`;
+
+    const membersList = document.getElementById("teamMembers");
+
+    membersList.innerHTML = "";
+
+    if (!team.members || team.members.length === 0) {
+        membersList.innerHTML = "<p class='empty-state'>Brak członków zespołu do wyświetlenia.</p>";
+    } else {
+        team.members.forEach(member => {
+            const li = document.createElement("li");
+            li.textContent = member.fullName || "";
+            membersList.appendChild(li);
+        });
+    }
+
+    const repoButton = document.getElementById("repositoryButton");
+
+    if (team.status === "accepted") {
+        repoButton.classList.remove("hidden");
+    } else {
+        repoButton.classList.add("hidden");
+    }
+
+    showView("teamDetails");
+}
+
+function showRepository() {
+    renderRepositoryFiles();
+    showView("repository");
+}
+
+function renderRepositoryFiles() {
+    const fileList = document.getElementById("repositoryFiles");
+
+    fileList.innerHTML = "";
+
+    if (repositoryFiles.length === 0) {
+        fileList.innerHTML = "<li class='empty-state'>Brak plików do wyświetlenia.</li>";
+        return;
+    }
+
+    repositoryFiles.forEach(file => {
+        const li = document.createElement("li");
+        li.textContent = file.name || "";
+        fileList.appendChild(li);
+    });
+}
+
+function renderTagOptions(selectId) {
+    const select = document.getElementById(selectId);
+
+    select.innerHTML = "";
+
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "Wybierz tag";
+    select.appendChild(defaultOption);
+
+    availableTags.forEach(tag => {
+        const option = document.createElement("option");
+        option.value = tag;
+        option.textContent = tag;
+        select.appendChild(option);
+    });
+}
+
+function getSelectedOptions(selectId) {
+    const select = document.getElementById(selectId);
+
+    if (!select.value) {
+        return [];
+    }
+
+    return [select.value];
+}
+
+function setSelectedOptions(selectId, values) {
+    const select = document.getElementById(selectId);
+
+    if (!values || values.length === 0) {
+        select.value = "";
+        return;
+    }
+
+    select.value = values[0];
+}
+
+function clearSelectedOptions(selectId) {
+    const select = document.getElementById(selectId);
+    select.value = "";
+}
+
+function formatArray(value) {
+    if (!value || value.length === 0) {
+        return "";
+    }
+
+    return value.join(", ");
+}
+
+function getTodayDate() {
+    return new Date().toISOString().split("T")[0];
+}
+
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function logout() {
+    showView("dashboard", false);
+}
+
+loadInitialData();
+</script>
+
+</body>
+</html>
