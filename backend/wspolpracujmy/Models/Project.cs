@@ -2,14 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Newtonsoft.Json;
 
 namespace wspolpracujmy.Models
 {
     [Table("Project")]
+    /// <summary>
+    /// Reprezentuje projekt tworzony w aplikacji.
+    /// </summary>
     public class Project
     {
         [Key]
         [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
         [Required]
@@ -61,10 +66,19 @@ namespace wspolpracujmy.Models
         [Column("priority")]
         public required Priority Priority { get; set; }
 
+        [JsonIgnore]
         public required Company Company { get; set; }
+
+        [JsonIgnore]
         public required MeetingType MeetingType { get; set; }
+
+        [JsonIgnore]
         public ICollection<Group> Groups { get; set; } = new List<Group>();
+
+        [JsonIgnore]
         public ICollection<ProjectTag> ProjectTags { get; set; } = new List<ProjectTag>();
+
+        [JsonIgnore]
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
     }
 }

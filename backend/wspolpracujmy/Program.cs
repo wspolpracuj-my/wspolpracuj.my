@@ -33,6 +33,11 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Application services
+builder.Services.AddScoped<wspolpracujmy.Services.ProjectService>();
+builder.Services.AddScoped<wspolpracujmy.Services.ProjectCommentService>();
+builder.Services.AddScoped<wspolpracujmy.Services.NotificationService>();
+
 builder.Services.AddScoped<JwtTokenService>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -65,6 +70,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    // Seed development data (runs only in Development)
     await TestDataSeeder.SeedAsync(app);
 }
 

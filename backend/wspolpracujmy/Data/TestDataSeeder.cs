@@ -19,6 +19,18 @@ namespace wspolpracujmy.Data
             var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("TestDataSeeder");
             var context = services.GetRequiredService<AppDbContext>();
 
+            // Always perform a lightweight data cleanup for known enum/string mismatches
+            // (this fixes cases where other tables' enum values leaked into GroupRequests.status)
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"GroupRequests\" SET status = 'Pending' WHERE status NOT IN ('Pending','Accepted','Declined');");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to run GroupRequests.status cleanup; continuing.");
+            }
+
             // avoid seeding when data already present
             if (await context.Users.AnyAsync())
             {
@@ -48,9 +60,10 @@ namespace wspolpracujmy.Data
                 await context.Companies.AddRangeAsync(c1, c2);
 
                 // Meeting types
-                var mtOnline = new MeetingType { Id = 1, Type = "online" };
-                var mtOffline = new MeetingType { Id = 2, Type = "offline" };
-                await context.Meeting_types.AddRangeAsync(mtOnline, mtOffline);
+                var mtOnline = new MeetingType { Id = 1, Type = "Online" };
+                var mtCompany = new MeetingType { Id = 2, Type = "Siedziba firmy" };
+                var mtUniversity = new MeetingType { Id = 3, Type = "UZ" };
+                await context.Meeting_types.AddRangeAsync(mtOnline, mtCompany, mtUniversity);
 
                 // Tags
                 var tags = new[] {
@@ -88,11 +101,11 @@ namespace wspolpracujmy.Data
                     Description = "Wsparcie dla zespołów startupowych",
                     CreatedAt = DateTime.UtcNow,
                     MaxNumberGroupMembers = 5,
-                    MeetingTypeId = mtOffline.Id,
+                    MeetingTypeId = mtCompany.Id,
                     LanguageDoc = LanguageDoc.English,
                     Priority = Priority.P3,
                     Company = c2,
-                    MeetingType = mtOffline
+                    MeetingType = mtCompany
                 };
                 await context.Projects.AddRangeAsync(p1, p2);
 
@@ -136,8 +149,8 @@ namespace wspolpracujmy.Data
                 await context.Responses.AddRangeAsync(r1, r2);
 
                 // Notifications
-                var n1 = new Notification { Id = 1, UserId = u5.Id, Content = "Twoja prośba o dołączenie została zaakceptowana.", Status = NotificationStatus.NotRead, User = u5 };
-                var n2 = new Notification { Id = 2, UserId = u1.Id, Content = "Nowy komentarz do Twojego projektu.", Status = NotificationStatus.NotRead, User = u1 };
+                var n1 = new Notification { Id = 1, UserId = u5.Id, Content = "Twoja prośba o dołączenie została zaakceptowana.", Status = NotificationStatus.NotRead, User = u5, CreatedAt = DateTime.UtcNow };
+                var n2 = new Notification { Id = 2, UserId = u1.Id, Content = "Nowy komentarz do Twojego projektu.", Status = NotificationStatus.NotRead, User = u1, CreatedAt = DateTime.UtcNow };
                 await context.Notifications.AddRangeAsync(n1, n2);
 
                 // fix group leaders (assign Student objects as leaders) and update groups
@@ -151,18 +164,44 @@ namespace wspolpracujmy.Data
 
                 // GroupRequests table does not have a model in the project — insert via raw SQL if table exists
                 var now = DateTime.UtcNow;
+                // Seed a sample GroupRequest via EF so enum mapping is respected
+                var gr1 = new GroupRequest
+                {
+                    Id = 1,
+                    GroupId = g1.Id,
+                    StudentId = s3.Id,
+                    CreatedByUserId = s3.UserId,
+                    Status = GroupStatus.Accepted,
+                    Type = "join_request",
+                    CreatedAt = now,
+                    RespondedAt = now
+                };
+                await context.GroupRequests.AddAsync(gr1);
+
+                await tx.CommitAsync();
+
+                // Ensure PostgreSQL sequences are advanced past the seeded max ids
+                // so subsequent inserts (without explicit Id) won't conflict.
                 try
                 {
-                    await context.Database.ExecuteSqlRawAsync(
-                        "INSERT INTO \"GroupRequests\" (\"id\", \"group_id\", \"student_id\", \"created_by_user_id\", \"status\", \"type\", \"created_at\", \"responded_at\") VALUES (1, 1, 3, 3, 'accepted', 'join_request', {0}, {0})",
-                        parameters: new object[] { now });
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Users\"','id'), COALESCE((SELECT MAX(id) FROM \"Users\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Companies\"','id'), COALESCE((SELECT MAX(id) FROM \"Companies\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Meeting_types\"','id'), COALESCE((SELECT MAX(id) FROM \"Meeting_types\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Tags\"','id'), COALESCE((SELECT MAX(id) FROM \"Tags\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Project\"','id'), COALESCE((SELECT MAX(id) FROM \"Project\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Groups\"','id'), COALESCE((SELECT MAX(id) FROM \"Groups\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Students\"','id'), COALESCE((SELECT MAX(id) FROM \"Students\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Comments\"','id'), COALESCE((SELECT MAX(id) FROM \"Comments\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Responses\"','id'), COALESCE((SELECT MAX(id) FROM \"Responses\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"Notifications\"','id'), COALESCE((SELECT MAX(id) FROM \"Notifications\"),0) + 1);");
+                    await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('\"GroupRequests\"','id'), COALESCE((SELECT MAX(id) FROM \"GroupRequests\"),0) + 1);");
                 }
                 catch (DbException ex)
                 {
-                    logger.LogWarning(ex, "GroupRequests table not found or insert failed; skipping raw insert.");
+                    // Non-fatal: log and continue. Sequence adjustment best-effort.
+                    logger.LogWarning(ex, "Failed to adjust sequences after seeding; continuing.");
                 }
 
-                await tx.CommitAsync();
                 logger.LogInformation("Test data seeded.");
             }
             catch (Exception ex)

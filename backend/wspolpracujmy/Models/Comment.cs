@@ -2,14 +2,19 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace wspolpracujmy.Models
 {
     [Table("Comments")]
+    /// <summary>
+    /// Reprezentuje komentarz dotyczący projektu; zawiera treść, autora i czas utworzenia.
+    /// </summary>
     public class Comment
     {
         [Key]
         [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
         [Required]
@@ -28,8 +33,13 @@ namespace wspolpracujmy.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
+        [JsonIgnore]
         public required User User { get; set; }
+
+        [JsonIgnore]
         public required Project Project { get; set; }
+
+        [JsonIgnore]
         public ICollection<Response> Responses { get; set; } = new List<Response>();
     }
 }

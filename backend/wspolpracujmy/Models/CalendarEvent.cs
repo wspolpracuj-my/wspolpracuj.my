@@ -1,10 +1,14 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Newtonsoft.Json;
 
 namespace wspolpracujmy.Models
 {
     [Table("CalendarEvents")]
+    /// <summary>
+    /// Reprezentuje zdarzenie kalendarza (termin, spotkanie) w aplikacji.
+    /// </summary>
     public class CalendarEvent
     {
         [Key]
@@ -24,6 +28,7 @@ namespace wspolpracujmy.Models
         [Column("name")]
         public required string Name { get; set; }
 
+        [JsonIgnore]
         public required Group Group { get; set; }
     }
 }
