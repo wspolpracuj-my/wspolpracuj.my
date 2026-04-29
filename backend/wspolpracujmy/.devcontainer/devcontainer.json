@@ -9,5 +9,13 @@
         8080,
         5432
     ],
-    "postCreateCommand": "sh -lc 'set -e; SLN=$(find /workspace /workspaces -maxdepth 4 -name \"*.sln\" 2>/dev/null | head -n 1); if [ -z \"$SLN\" ]; then echo \"Nie znaleziono pliku .sln w /workspace ani /workspaces\"; echo \"Zawartosc /workspace:\"; ls -la /workspace 2>/dev/null || true; echo \"Zawartosc /workspaces:\"; ls -la /workspaces 2>/dev/null || true; exit 1; fi; echo \"Restore: $SLN\"; dotnet restore \"$SLN\"'"
+    "postCreateCommand": "sh -lc 'set -e; SLN=$(find /workspace /workspaces -maxdepth 4 -name \"*.sln\" 2>/dev/null | head -n 1); if [ -z \"$SLN\" ]; then echo \"Nie znaleziono pliku .sln w /workspace ani /workspaces\"; echo \"Zawartosc /workspace:\"; ls -la /workspace 2>/dev/null || true; echo \"Zawartosc /workspaces:\"; ls -la /workspaces 2>/dev/null || true; exit 1; fi; echo \"Restore: $SLN\"; dotnet restore \"$SLN\"'",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-ossdata.vscode-pgsql",
+                "ms-dotnettools.csdevkit"
+            ]
+        }
+    }
 }

@@ -3,11 +3,11 @@ CREATE TABLE "Users" (
   "name" varchar NOT NULL,
   "surname" varchar NOT NULL,
   "role" "ENUM(admin,student,company)" NOT NULL,
-  "email" varchar UNIQUE NOT NULL,
-  "password" varchar NOT NULL
+  "login" varchar UNIQUE NOT NULL,
+  "password_hash" varchar NOT NULL
 );
 
-CREATE TABLE "Company" (
+CREATE TABLE "Companies" (
   "id" integer PRIMARY KEY,
   "user_id" integer UNIQUE NOT NULL,
   "company_name" varchar NOT NULL,
@@ -17,19 +17,31 @@ CREATE TABLE "Company" (
 CREATE TABLE "Students" (
   "id" integer PRIMARY KEY,
   "user_id" integer UNIQUE NOT NULL,
-  "group_id" integer
+  "group_id" integer,
+  "email" varchar UNIQUE NOT NULL
 );
 
 CREATE TABLE "Groups" (
   "id" integer PRIMARY KEY,
   "name" varchar NOT NULL,
-  "project_id" integer,
-  "is_accepted" "ENUM(pending,accepted,declined)",
-  "leader_id" integer,
-  "number" integer
+  "project_id" integer NOT NULL,
+  "is_accepted" "ENUM(pending,accepted,declined)" NOT NULL,
+  "leader_id" integer NOT NULL,
+  -- number_of_members removed; compute on demand from Students table
 );
 
-CREATE TABLE "Projects" (
+CREATE TABLE "GroupRequests" (
+  "id" integer PRIMARY KEY,
+  "group_id" integer NOT NULL,
+  "student_id" integer NOT NULL,
+  "created_by_user_id" integer NOT NULL,
+  "status" "ENUM(pending,accepted,declined)" NOT NULL,
+  "type" "ENUM(invite,join_request)" NOT NULL,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+  "responded_at" timestamp
+);
+
+CREATE TABLE "Project" (
   "id" integer PRIMARY KEY,
   "company_id" integer NOT NULL,
   "topic" varchar NOT NULL,
@@ -37,46 +49,46 @@ CREATE TABLE "Projects" (
   "project_goal" varchar,
   "work_scope" varchar,
   "needed_technologies" varchar,
-  "created_at" timestamp,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
   "max_groups" integer,
-  "max_number_group_members" integer,
-  "meeting_type_id" integer,
+  "max_number_group_members" integer NOT NULL,
+  "meeting_type_id" integer NOT NULL,
   "partnership_type" varchar,
-  "language_doc" "ENUM(polish,english)",
+  "language_doc" "ENUM(polish,english)" NOT NULL,
   "notes" varchar,
-  "priority" "ENUM(1,2,3,4,5)"
+  "priority" "ENUM(1,2,3,4,5)" NOT NULL
 );
 
 CREATE TABLE "Files" (
   "id" uuid PRIMARY KEY,
-  "user_id" integer,
+  "user_id" integer NOT NULL,
   "original_name" varchar NOT NULL,
   "gcs_bucket" text NOT NULL,
   "gcs_object_name" varchar NOT NULL,
   "content_type" varchar NOT NULL,
   "size_bytes" bigint NOT NULL,
-  "created_at" timestamp NOT NULL
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 );
 
 CREATE TABLE "GroupFiles" (
-  "group_id" integer,
-  "file_id" uuid
+  "group_id" integer NOT NULL,
+  "file_id" uuid NOT NULL
 );
 
 CREATE TABLE "Comments" (
   "id" integer PRIMARY KEY,
   "user_id" integer NOT NULL,
-  "project_id" integer,
-  "content" varchar,
-  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP)
+  "project_id" integer NOT NULL,
+  "content" varchar NOT NULL,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 );
 
 CREATE TABLE "Responses" (
   "id" integer PRIMARY KEY,
   "comment_id" integer NOT NULL,
   "user_id" integer NOT NULL,
-  "content" varchar,
-  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP)
+  "content" varchar NOT NULL,
+  "created_at" timestamp DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 );
 
 CREATE TABLE "Tags" (
@@ -85,30 +97,31 @@ CREATE TABLE "Tags" (
 );
 
 CREATE TABLE "ProjectTags" (
-  "project_id" integer,
-  "tag_id" integer
+  "project_id" integer NOT NULL,
+  "tag_id" integer NOT NULL
+  PRIMARY KEY ("project_id", "tag_id"),
 );
 
 CREATE TABLE "Notifications" (
   "id" integer PRIMARY KEY,
   "user_id" integer NOT NULL,
-  "content" varchar,
-  "status" "ENUM(not-read,read)"
+  "content" varchar NOT NULL,
+  "status" "ENUM(not-read,read)" NOT NULL,
 );
 
-CREATE TABLE "Calendar" (
+CREATE TABLE "CalendarEvents" (
   "id" integer PRIMARY KEY,
-  "time" timestamp,
-  "name" varchar,
-  "group_id" integer
+  "time" timestamp NOT NULL,
+  "name" varchar NOT NULL,
+  "group_id" integer NOT NULL
 );
 
-CREATE TABLE "Meeting_type" (
+CREATE TABLE "Meeting_types" (
   "id" integer PRIMARY KEY,
-  "type" varchar
+  "type" varchar NOT NULL
 );
 
-ALTER TABLE "Company" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "Companies" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "Students" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -143,3 +156,17 @@ ALTER TABLE "ProjectTags" ADD FOREIGN KEY ("tag_id") REFERENCES "Tags" ("id") DE
 ALTER TABLE "Notifications" ADD FOREIGN KEY ("user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "Calendar" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupRequests" ADD FOREIGN KEY ("group_id") REFERENCES "Groups" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupRequests" ADD FOREIGN KEY ("student_id") REFERENCES "Students" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "GroupRequests" ADD FOREIGN KEY ("created_by_user_id") REFERENCES "Users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+CREATE INDEX idx_comments_project_id ON "Comments" ("project_id");
+
+CREATE INDEX idx_responses_comment_id ON "Responses" ("comment_id");
+
+CREATE INDEX idx_projecttags_project_id ON "ProjectTags" ("project_id");
+
+CREATE INDEX idx_projecttags_tag_id ON "ProjectTags" ("tag_id");
