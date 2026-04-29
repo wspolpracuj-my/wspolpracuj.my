@@ -15,6 +15,11 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Application services
+builder.Services.AddScoped<wspolpracujmy.Services.ProjectService>();
+builder.Services.AddScoped<wspolpracujmy.Services.ProjectCommentService>();
+builder.Services.AddScoped<wspolpracujmy.Services.NotificationService>();
+
 var app = builder.Build();
 
 
@@ -24,31 +29,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    // Seed development data (runs only in Development)
     await TestDataSeeder.SeedAsync(app);
     // app.UseHttpsRedirection();
-    // Seed development data (runs only in Development)
-    // await app.SeedIfDevelopmentAsync();
 }
-
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
 
 // app.Urls.Add("http://+:8080");  // Lub builder.WebHost.UseUrls("http://+:8080"); przed Build()
 app.MapControllers();

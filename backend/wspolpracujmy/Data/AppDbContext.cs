@@ -6,6 +6,19 @@ namespace wspolpracujmy.Data
 {
     public class AppDbContext : DbContext
     {
+        private static GroupStatus ParseGroupStatus(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return GroupStatus.Pending;
+            try
+            {
+                return (GroupStatus)Enum.Parse(typeof(GroupStatus), v, true);
+            }
+            catch
+            {
+                return GroupStatus.Pending;
+            }
+        }
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         public DbSet<User> Users { get; set; }
@@ -42,6 +55,16 @@ namespace wspolpracujmy.Data
             modelBuilder.Entity<CalendarEvent>().ToTable("CalendarEvents");
             modelBuilder.Entity<MeetingType>().ToTable("Meeting_types");
             modelBuilder.Entity<GroupRequest>().ToTable("GroupRequests");
+
+            // Store GroupRequest.Status enum as string in the database
+            // When reading from the DB, tolerate unexpected string values by falling
+            // back to GroupStatus.Pending instead of throwing an exception.
+            modelBuilder.Entity<GroupRequest>()
+                .Property(gr => gr.Status)
+                .HasConversion(
+                    v => v.ToString(),
+                    v => ParseGroupStatus(v)
+                );
 
             // Composite keys
             modelBuilder.Entity<ProjectTag>()
