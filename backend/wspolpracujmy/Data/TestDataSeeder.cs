@@ -1,4 +1,5 @@
 using System;
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -156,7 +157,7 @@ namespace wspolpracujmy.Data
                         "INSERT INTO \"GroupRequests\" (\"id\", \"group_id\", \"student_id\", \"created_by_user_id\", \"status\", \"type\", \"created_at\", \"responded_at\") VALUES (1, 1, 3, 3, 'accepted', 'join_request', {0}, {0})",
                         parameters: new object[] { now });
                 }
-                catch (Exception ex)
+                catch (DbException ex)
                 {
                     logger.LogWarning(ex, "GroupRequests table not found or insert failed; skipping raw insert.");
                 }
