@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Logowanie / Rejestracja</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrapper">
+
+    <!-- LEWA STRONA -->
+    <div class="left">
+        <h3 class="logo">wspolpracuj.my</h3>
+
+        <div class="badge">WITAJ W WSPOLPRACUJ.MY</div>
+
+        <h1>
+            Przygotuj się na <br>
+            <span>rynek pracy szybciej</span>
+        </h1>
+
+        <p class="desc">
+            Platforma łącząca studentów i firmy.<br>
+            Współpracuj, rozwijaj się, osiągaj więcej.
+        </p>
+
+        <div class="features">
+            <div>
+                <strong>Dla studentów</strong>
+                <p>Zdobywaj doświadczenie i pracuj nad projektami.</p>
+            </div>
+
+            <div>
+                <strong>Dla firm</strong>
+                <p>Znajdź utalentowanych studentów.</p>
+            </div>
+
+            <div>
+                <strong>Prosto i szybko</strong>
+                <p>Intuicyjna platforma dla każdego.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRAWA STRONA -->
+    <div class="right">
+
+        <!-- REJESTRACJA -->
+        
+
+        <!-- LOGOWANIE -->
+        <div id="login">
+            <h2>Logowanie</h2>
+            <p class="subtitle">Witaj ponownie</p>
+
+            <form>
+                <input type="text" placeholder="Login">
+                <input type="password" placeholder="Hasło">
+
+                <button>Zaloguj się</button>
+            </form>
+
+            <p class="switch">
+                Nie masz konta? <span onclick="toggle()">Zarejestruj się</span>
+            </p>
+        </div>
+        <div id="register" class="hidden">
+            <h2>Rejestracja</h2>
+            <p class="subtitle">Stwórz konto już teraz</p>
+
+            <form>
+                <input type="text" placeholder="Imię">
+                <input type="text" placeholder="Nazwisko">
+                <input type="text" placeholder="Login">
+                <input type="email" placeholder="Email">
+                <input type="password" placeholder="Hasło">
+                <input type="password" placeholder="Potwierdź hasło">
+
+                <button>Zarejestruj się</button>
+            </form>
+
+            <p class="switch">
+                Masz już konto? <span onclick="toggle()">Zaloguj się</span>
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+function toggle() {
+    document.getElementById("login").classList.toggle("hidden");
+    document.getElementById("register").classList.toggle("hidden");
+}
+</script>
+
+</body>
+</html>
