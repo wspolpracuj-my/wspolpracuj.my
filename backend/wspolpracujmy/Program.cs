@@ -8,6 +8,22 @@ using wspolpracujmy.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+const string AllowFrontend = "AllowFrontend";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(AllowFrontend, policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5500",
+                "http://127.0.0.1:5500"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers().AddNewtonsoftJson();
 
@@ -78,4 +94,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.UseCors(AllowFrontend);
 app.Run();

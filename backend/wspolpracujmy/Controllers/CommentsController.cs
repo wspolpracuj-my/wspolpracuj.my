@@ -71,7 +71,7 @@ namespace wspolpracujmy.Controllers
             return Ok(comments);
         }
 
-        [HttpGet("project/{projectId}")]
+/*         [HttpGet("project/{projectId}")]
         public async Task<ActionResult<IEnumerable<Comment>>> GetByProjectId(int projectId)
         {
             var comments = await _db.Comments
@@ -79,7 +79,7 @@ namespace wspolpracujmy.Controllers
                 .Where(c => c.ProjectId == projectId)
                 .ToListAsync();
             return comments;
-        }
+        } */
 
         [HttpPost]
         /// <summary>

@@ -59,7 +59,7 @@ namespace wspolpracujmy.Controllers
                 Surname = dto.Surname,
                 Role = dto.Role,
                 Login = dto.Login,
-                Password = dto.Password
+                PasswordHash = dto.Password
             };
 
             _db.Users.Add(user);
