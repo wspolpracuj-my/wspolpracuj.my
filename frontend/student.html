@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel studenta - wspolpracuj.my</title>
+    <link rel="stylesheet" href="student.css">
+</head>
+<body>
+
+<div class="app">
+    <main class="content">
+
+        <header class="topbar">
+            <div class="brand">
+                <h2 class="logo">wspolpracuj.my</h2>
+                <p class="account-type">Panel studenta</p>
+            </div>
+
+            <button class="logout-btn" onclick="logout()">Wyloguj</button>
+        </header>
+
+        <section id="dashboard" class="view active-view">
+            <div class="student-start-box">
+                <h1>Cześć<span id="studentName"></span></h1>
+
+                <button onclick="showTeamEntry()">ZESPÓŁ</button>
+                <button onclick="showNotifications()">POWIADOMIENIA</button>
+            </div>
+        </section>
+
+        <section id="notifications" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Powiadomienia</h2>
+                    <p class="muted">Powiadomienia dotyczą wyłącznie zespołu studenta.</p>
+                </div>
+            </div>
+
+            <div id="allNotifications" class="notification-list card"></div>
+        </section>
+
+        <section id="teamChoice" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="student-start-box wider-box">
+                <h2>Zespół</h2>
+                <p class="muted center-text">
+                    Nie należysz jeszcze do zespołu. Możesz stworzyć własny zespół albo dołączyć do zespołu, do którego zostałeś zaproszony.
+                </p>
+
+                <button onclick="showCreateTeam()">STWÓRZ ZESPÓŁ</button>
+                <button onclick="showJoinTeam()">DOŁĄCZ DO ZESPOŁU</button>
+            </div>
+        </section>
+
+        <section id="createTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Stwórz zespół</h2>
+                    <p class="muted">Tworzący zespół automatycznie otrzymuje rolę lidera.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="createTeam(event)">
+                <label>
+                    Nazwa zespołu
+                    <input id="newTeamName" type="text">
+                </label>
+
+                <label>
+                    Liczba członków zespołu
+                    <input id="newTeamSize" type="number" min="1">
+                </label>
+
+                <button type="submit">Stwórz</button>
+                <p id="createTeamMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="joinTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Dołącz do zespołu</h2>
+                    <p class="muted">Lista zespołów, do których student został zaproszony.</p>
+                </div>
+            </div>
+
+            <div id="invitedTeamsList" class="team-list scroll-list"></div>
+        </section>
+
+        <section id="teamProjectMenu" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="student-start-box wider-box">
+                <h2>Twój zespół / Twój projekt</h2>
+
+                <button onclick="showMyTeam()">TWÓJ ZESPÓŁ</button>
+                <button onclick="showStudentProject()">TWÓJ PROJEKT</button>
+            </div>
+        </section>
+
+        <section id="myTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Twój zespół</p>
+                    <h2 id="myTeamName"></h2>
+                    <p id="myTeamRole" class="muted"></p>
+                </div>
+
+                <button id="editTeamButton" class="small-primary hidden" onclick="showEditTeam()">Edytuj</button>
+            </div>
+
+            <div id="teamMembersList" class="card member-list"></div>
+        </section>
+
+        <section id="inviteStudent" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Zaproś studenta</h2>
+                    <p class="muted">Podaj mail studencki osoby, którą chcesz zaprosić do zespołu.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="inviteStudent(event)">
+                <label>
+                    Mail studencki
+                    <input id="inviteEmail" type="email">
+                </label>
+
+                <button type="submit">Zaproś</button>
+                <p id="inviteMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="removeStudent" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Usuń studenta</h2>
+                    <p id="removeStudentText" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="card confirm-card">
+                <button class="danger-main" onclick="confirmRemoveStudent()">Usuń</button>
+            </div>
+        </section>
+
+        <section id="editTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Edytuj zespół</h2>
+                    <p class="muted">Można edytować tylko liczbę członków zespołu. Nazwa zespołu pozostaje bez zmian.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="confirmEditTeam(event)">
+                <label>
+                    Nazwa zespołu
+                    <input id="editTeamName" type="text" disabled>
+                </label>
+
+                <label>
+                    Liczba członków zespołu
+                    <input id="editTeamSize" type="number" min="1">
+                </label>
+
+                <button type="submit">Edytuj</button>
+                <p id="editTeamMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="studentProject" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Twój projekt</h2>
+                    <p id="studentProjectDescription" class="muted"></p>
+                </div>
+            </div>
+
+            <div id="studentProjectContent"></div>
+        </section>
+
+        <section id="availableProjects" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Dostępne projekty</h2>
+                    <p class="muted">Lista projektów od najnowszych.</p>
+                </div>
+            </div>
+
+            <div id="availableProjectsList" class="project-list scroll-list"></div>
+        </section>
+
+        <section id="selectedProject" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Wybrany projekt</p>
+                    <h2 id="selectedProjectTitle"></h2>
+                    <p id="selectedProjectCompany" class="muted"></p>
+                </div>
+            </div>
+
+            <div id="selectedProjectActions" class="quick-actions"></div>
+
+            <div class="card details-card">
+                <h3>Status zgłoszenia</h3>
+                <p id="selectedProjectStatus" class="status-text"></p>
+
+                <h3>Opis</h3>
+                <p id="selectedProjectDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="selectedProjectGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="selectedProjectWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="selectedProjectTechResources"></p>
+            </div>
+        </section>
+
+        <section id="projectComments" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Komentarze</h2>
+                    <p class="muted">Zespół widzi swoje komentarze oraz odpowiedzi firmy.</p>
+                </div>
+            </div>
+
+            <div class="card project-form">
+                <label>
+                    Nowy komentarz
+                    <textarea id="newCommentText"></textarea>
+                </label>
+
+                <button onclick="addComment()">Dodaj komentarz</button>
+                <p id="commentMessage" class="form-message"></p>
+            </div>
+
+            <div id="projectCommentsList" class="card comment-list comments-margin"></div>
+        </section>
+
+        <section id="projectGuidelines" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Wytyczne</h2>
+                    <p class="muted">Dane projektu wypełnione przez firmę. Widok tylko do odczytu.</p>
+                </div>
+            </div>
+
+            <div class="card details-card">
+                <h3>Temat</h3>
+                <p id="guidelinesTopic"></p>
+
+                <h3>Zleceniodawca</h3>
+                <p id="guidelinesCompany"></p>
+
+                <h3>Opis</h3>
+                <p id="guidelinesDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="guidelinesGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="guidelinesWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="guidelinesTechResources"></p>
+
+                <h3>Tagi</h3>
+                <div id="guidelinesTags" class="selected-tags"></div>
+            </div>
+        </section>
+
+        <section id="repository" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Repozytorium</p>
+                    <h2>Pliki</h2>
+                    <p class="muted">Miejsce na wrzucanie plików związanych z projektem.</p>
+                </div>
+            </div>
+
+            <div class="card repository-box">
+                <h3>Pliki</h3>
+
+                <div class="upload-area">
+                    <p>Wybierz pliki z dysku.</p>
+                    <input type="file" multiple>
+                </div>
+
+                <ul id="repositoryFiles" class="file-list"></ul>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+let studentData = {
+    id: null,
+    fullName: "",
+    email: "",
+    teamId: null
+};
+
+let currentTeam = null;
+let currentProjectId = null;
+let currentStudentToRemoveId = null;
+
+const viewHistory = [];
+
+let notifications = [];
+let invitedTeams = [];
+let availableProjects = [];
+let projectComments = [];
+let repositoryFiles = [];
+
+const applicationStatuses = {
+    none: "Brak zgłoszenia",
+    pending: "Oczekujący",
+    rejected: "Odrzucony",
+    accepted: "Zaakceptowany"
+};
+
+function loadInitialData() {
+    setStudentData(studentData);
+    renderNotifications();
+}
+
+async function saveTeamToBackend(teamData) {
+    return teamData;
+}
+
+async function joinTeamInBackend(teamId) {
+    return teamId;
+}
+
+async function updateTeamInBackend(teamData) {
+    return teamData;
+}
+
+async function inviteStudentToBackend(email) {
+    return email;
+}
+
+async function removeStudentFromBackend(studentId) {
+    return studentId;
+}
+
+async function applyTeamToProjectInBackend(projectId) {
+    return projectId;
+}
+
+async function saveCommentToBackend(commentData) {
+    return commentData;
+}
+
+function setStudentData(data) {
+    studentData = data || {
+        id: null,
+        fullName: "",
+        email: "",
+        teamId: null
+    };
+
+    const studentNameElement = document.getElementById("studentName");
+
+    if (studentData.fullName) {
+        studentNameElement.textContent = `, ${studentData.fullName}`;
+    } else {
+        studentNameElement.textContent = "";
+    }
+}
+
+function showView(viewId, saveHistory = true) {
+    const currentView = document.querySelector(".active-view");
+
+    if (currentView && saveHistory && currentView.id !== viewId) {
+        viewHistory.push(currentView.id);
+    }
+
+    document.querySelectorAll(".view").forEach(view => {
+        view.classList.remove("active-view");
+    });
+
+    document.getElementById(viewId).classList.add("active-view");
+}
+
+function goBack() {
+    const previousView = viewHistory.pop();
+
+    if (previousView) {
+        showView(previousView, false);
+    } else {
+        showView("dashboard", false);
+    }
+}
+
+function logout() {
+    showView("dashboard", false);
+}
+
+function showTeamEntry() {
+    if (currentTeam) {
+        showView("teamProjectMenu");
+    } else {
+        showView("teamChoice");
+    }
+}
+
+function showNotifications() {
+    renderNotifications();
+    showView("notifications");
+}
+
+function renderNotifications() {
+    const allNotifications = document.getElementById("allNotifications");
+
+    allNotifications.innerHTML = "";
+
+    if (!currentTeam || notifications.length === 0) {
+        allNotifications.innerHTML = "<p class='empty-state'>Brak powiadomień do wyświetlenia.</p>";
+        return;
+    }
+
+    notifications.forEach(notification => {
+        allNotifications.appendChild(createNotification(notification));
+    });
+}
+
+function createNotification(notification) {
+    const item = document.createElement("div");
+    item.className = "notification-item";
+    item.textContent = notification.text || "";
+    return item;
+}
+
+function showCreateTeam() {
+    document.getElementById("createTeamMessage").textContent = "";
+    showView("createTeam");
+}
+
+async function createTeam(event) {
+    event.preventDefault();
+
+    const name = document.getElementById("newTeamName").value.trim();
+    const size = Number(document.getElementById("newTeamSize").value);
+    const message = document.getElementById("createTeamMessage");
+
+    if (!name || !size || size < 1) {
+        message.textContent = "Niepomyślnie stworzono zespół. Uzupełnij poprawnie wszystkie pola.";
+        message.className = "form-message error";
+        return;
+    }
+
+    const teamData = {
+        id: Date.now(),
+        name: name,
+        size: size,
+        leaderId: studentData.id,
+        projectId: null,
+        applicationStatus: "none",
+        members: [
+            {
+                id: studentData.id,
+                fullName: studentData.fullName,
+                email: studentData.email,
+                role: "leader"
+            }
+        ]
+    };
+
+    const savedTeam = await saveTeamToBackend(teamData);
+
+    currentTeam = savedTeam;
+    studentData.teamId = savedTeam.id;
+
+    event.target.reset();
+
+    showView("dashboard");
+}
+
+function showJoinTeam() {
+    renderInvitedTeams();
+    showView("joinTeam");
+}
+
+function renderInvitedTeams() {
+    const list = document.getElementById("invitedTeamsList");
+    list.innerHTML = "";
+
+    if (invitedTeams.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak zaproszeń do zespołów.</p></div>";
+        return;
+    }
+
+    invitedTeams.forEach(team => {
+        const card = document.createElement("div");
+        card.className = "team-card";
+
+        card.innerHTML = `
+            <div class="team-main">
+                <strong>${escapeHtml(team.name || "")}</strong>
+                <span>Liczba miejsc: ${team.members?.length || 0}/${team.size || 0}</span>
+            </div>
+
+            <div class="team-actions">
+                <button onclick="joinTeam(${team.id})">Dołącz do zespołu</button>
+            </div>
+        `;
+
+        list.appendChild(card);
+    });
+}
+
+async function joinTeam(teamId) {
+    if (currentTeam) {
+        return;
+    }
+
+    await joinTeamInBackend(teamId);
+
+    const team = invitedTeams.find(item => item.id === teamId);
+
+    if (!team) {
+        return;
+    }
+
+    currentTeam = {
+        ...team,
+        members: [
+            ...(team.members || []),
+            {
+                id: studentData.id,
+                fullName: studentData.fullName,
+                email: studentData.email,
+                role: "member"
+            }
+        ]
+    };
+
+    studentData.teamId = currentTeam.id;
+
+    showView("dashboard");
+}
+
+function showMyTeam() {
+    if (!currentTeam) {
+        showTeamEntry();
+        return;
+    }
+
+    const isLeader = isCurrentStudentLeader();
+
+    document.getElementById("myTeamName").textContent = currentTeam.name || "";
+    document.getElementById("myTeamRole").textContent = isLeader ? "Twoja rola: lider zespołu" : "Twoja rola: członek zespołu";
+
+    const editButton = document.getElementById("editTeamButton");
+
+    if (isLeader) {
+        editButton.classList.remove("hidden");
+    } else {
+        editButton.classList.add("hidden");
+    }
+
+    renderTeamMembers();
+    showView("myTeam");
+}
+
+function renderTeamMembers() {
+    const container = document.getElementById("teamMembersList");
+    const isLeader = isCurrentStudentLeader();
+
+    container.innerHTML = "";
+
+    if (!currentTeam || !currentTeam.members || currentTeam.members.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak członków zespołu do wyświetlenia.</p>";
+        return;
+    }
+
+    const membersToDisplay = isLeader ? currentTeam.size : currentTeam.members.length;
+
+    for (let i = 0; i < membersToDisplay; i++) {
+        const member = currentTeam.members[i];
+
+        const row = document.createElement("div");
+        row.className = "member-row";
+
+        if (member) {
+            const crown = member.role === "leader" ? " 👑" : "";
+
+            row.innerHTML = `
+                <div>
+                    <strong>${i + 1}. ${escapeHtml(member.fullName || "")}${crown}</strong>
+                    <span>${escapeHtml(member.email || "")}</span>
+                </div>
+            `;
+
+            if (isLeader && member.role !== "leader") {
+                const removeButton = document.createElement("button");
+                removeButton.textContent = "Usuń";
+                removeButton.className = "danger-small";
+                removeButton.onclick = () => showRemoveStudent(member.id);
+
+                row.appendChild(removeButton);
+            }
+        } else {
+            row.innerHTML = `
+                <div>
+                    <strong>${i + 1}. Puste miejsce</strong>
+                    <span>Możesz zaprosić studenta.</span>
+                </div>
+            `;
+
+            if (isLeader) {
+                const inviteButton = document.createElement("button");
+                inviteButton.textContent = "Zaproś";
+                inviteButton.className = "small-primary";
+                inviteButton.onclick = showInviteStudent;
+
+                row.appendChild(inviteButton);
+            }
+        }
+
+        container.appendChild(row);
+    }
+}
+
+function showInviteStudent() {
+    document.getElementById("inviteEmail").value = "";
+    document.getElementById("inviteMessage").textContent = "";
+    showView("inviteStudent");
+}
+
+async function inviteStudent(event) {
+    event.preventDefault();
+
+    const email = document.getElementById("inviteEmail").value.trim();
+    const message = document.getElementById("inviteMessage");
+
+    if (!isValidEmail(email)) {
+        message.textContent = "Nie zaproszono studenta. Podaj poprawny mail studencki.";
+        message.className = "form-message error";
+        return;
+    }
+
+    await inviteStudentToBackend(email);
+
+    message.textContent = "Zaproszono studenta.";
+    message.className = "form-message success";
+
+    goBack();
+}
+
+function showRemoveStudent(studentId) {
+    currentStudentToRemoveId = studentId;
+
+    const student = currentTeam.members.find(member => member.id === studentId);
+
+    if (!student) {
+        return;
+    }
+
+    document.getElementById("removeStudentText").textContent =
+        `Czy chcesz usunąć studenta ${student.fullName} z zespołu ${currentTeam.name}?`;
+
+    showView("removeStudent");
+}
+
+async function confirmRemoveStudent() {
+    if (!currentStudentToRemoveId || !currentTeam) {
+        return;
+    }
+
+    await removeStudentFromBackend(currentStudentToRemoveId);
+
+    currentTeam.members = currentTeam.members.filter(member => member.id !== currentStudentToRemoveId);
+    currentStudentToRemoveId = null;
+
+    showMyTeam();
+}
+
+function showEditTeam() {
+    if (!currentTeam || !isCurrentStudentLeader()) {
+        return;
+    }
+
+    document.getElementById("editTeamName").value = currentTeam.name || "";
+    document.getElementById("editTeamSize").value = currentTeam.size || "";
+    document.getElementById("editTeamMessage").textContent = "";
+
+    showView("editTeam");
+}
+
+async function confirmEditTeam(event) {
+    event.preventDefault();
+
+    const size = Number(document.getElementById("editTeamSize").value);
+    const message = document.getElementById("editTeamMessage");
+
+    if (!size || size < currentTeam.members.length) {
+        message.textContent = "Nie zedytowano liczby członków zespołu. Liczba nie może być mniejsza niż obecna liczba członków.";
+        message.className = "form-message error";
+        return;
+    }
+
+    currentTeam.size = size;
+
+    await updateTeamInBackend(currentTeam);
+
+    showMyTeam();
+}
+
+function showStudentProject() {
+    const container = document.getElementById("studentProjectContent");
+    const description = document.getElementById("studentProjectDescription");
+
+    container.innerHTML = "";
+
+    if (!currentTeam) {
+        description.textContent = "Nie należysz jeszcze do zespołu, więc nie możesz zgłosić się do projektu.";
+        container.innerHTML = "<div class='card'><p class='empty-state'>Najpierw stwórz zespół albo dołącz do istniejącego zespołu.</p></div>";
+        showView("studentProject");
+        return;
+    }
+
+    if (currentTeam.projectId && currentTeam.applicationStatus === "accepted") {
+        const project = availableProjects.find(item => item.id === currentTeam.projectId);
+
+        description.textContent = "Twój zespół ma zaakceptowany projekt.";
+
+        container.innerHTML = `
+            <div class="card">
+                <h3>${escapeHtml(project?.topic || "")}</h3>
+                <p class="muted">${escapeHtml(project?.companyName || "")}</p>
+
+                <div class="quick-actions inside-card-actions">
+                    <button onclick="showProjectComments()">Komentarze</button>
+                    <button onclick="showProjectGuidelines(${currentTeam.projectId})">Wytyczne</button>
+                    <button onclick="showRepository()">Repozytorium</button>
+                </div>
+            </div>
+        `;
+
+        showView("studentProject");
+        return;
+    }
+
+    description.textContent = "Twój zespół nie ma jeszcze zaakceptowanego projektu.";
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+        <p class="muted">Możesz przejrzeć dostępne projekty i zgłosić zespół do wybranego projektu.</p>
+        <div class="quick-actions inside-card-actions">
+            <button onclick="showAvailableProjects()">Wybierz projekt</button>
+        </div>
+    `;
+
+    container.appendChild(card);
+    showView("studentProject");
+}
+
+function showAvailableProjects() {
+    renderAvailableProjects();
+    showView("availableProjects");
+}
+
+function renderAvailableProjects() {
+    const list = document.getElementById("availableProjectsList");
+    list.innerHTML = "";
+
+    if (availableProjects.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak projektów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    availableProjects.forEach(project => {
+        list.appendChild(createProjectCard(project));
+    });
+}
+
+function createProjectCard(project) {
+    const card = document.createElement("button");
+    card.className = "project-card";
+    card.onclick = () => showSelectedProject(project.id);
+
+    const acceptedTeams = project.acceptedTeams || 0;
+    const teamSlots = project.teamSlots || 0;
+
+    card.innerHTML = `
+        <div>
+            <strong>${escapeHtml(project.topic || "")}</strong>
+            <span>${escapeHtml(project.companyName || "")}</span>
+        </div>
+        <p>${acceptedTeams}/${teamSlots}</p>
+    `;
+
+    return card;
+}
+
+function showSelectedProject(projectId) {
+    currentProjectId = projectId;
+
+    const project = availableProjects.find(item => item.id === projectId);
+
+    if (!project) {
+        return;
+    }
+
+    const status = getProjectApplicationStatus(projectId);
+
+    document.getElementById("selectedProjectTitle").textContent = project.topic || "";
+    document.getElementById("selectedProjectCompany").textContent = project.companyName || "";
+    document.getElementById("selectedProjectStatus").textContent = applicationStatuses[status] || applicationStatuses.none;
+    document.getElementById("selectedProjectDescription").textContent = project.description || "";
+    document.getElementById("selectedProjectGoal").textContent = project.goal || "";
+    document.getElementById("selectedProjectWorkScope").textContent = project.workScope || "";
+    document.getElementById("selectedProjectTechResources").textContent = project.techResources || "";
+
+    renderSelectedProjectActions(project, status);
+
+    showView("selectedProject");
+}
+
+function renderSelectedProjectActions(project, status) {
+    const actions = document.getElementById("selectedProjectActions");
+    actions.innerHTML = "";
+
+    const commentsButton = document.createElement("button");
+    commentsButton.textContent = "Komentarze";
+    commentsButton.onclick = showProjectComments;
+
+    const guidelinesButton = document.createElement("button");
+    guidelinesButton.textContent = "Wytyczne";
+    guidelinesButton.onclick = () => showProjectGuidelines(project.id);
+
+    actions.appendChild(commentsButton);
+    actions.appendChild(guidelinesButton);
+
+    const projectFull = (project.acceptedTeams || 0) >= (project.teamSlots || 0);
+
+    if (isCurrentStudentLeader() && status !== "pending" && status !== "accepted" && !projectFull) {
+        const applyButton = document.createElement("button");
+        applyButton.textContent = "Zgłoś zespół";
+        applyButton.onclick = () => applyTeamToProject(project.id);
+
+        actions.prepend(applyButton);
+    }
+}
+
+async function applyTeamToProject(projectId) {
+    if (!currentTeam || !isCurrentStudentLeader()) {
+        return;
+    }
+
+    await applyTeamToProjectInBackend(projectId);
+
+    currentTeam.projectId = projectId;
+    currentTeam.applicationStatus = "pending";
+
+    showSelectedProject(projectId);
+}
+
+function getProjectApplicationStatus(projectId) {
+    if (!currentTeam || currentTeam.projectId !== projectId) {
+        return "none";
+    }
+
+    return currentTeam.applicationStatus || "none";
+}
+
+function showProjectComments() {
+    const list = document.getElementById("projectCommentsList");
+    const commentMessage = document.getElementById("commentMessage");
+
+    commentMessage.textContent = "";
+    list.innerHTML = "";
+
+    const commentsForProject = projectComments.filter(comment => {
+        return comment.projectId === currentProjectId && comment.teamId === currentTeam?.id;
+    });
+
+    if (commentsForProject.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
+    } else {
+        commentsForProject.forEach(comment => {
+            const item = document.createElement("div");
+            item.className = "comment-item";
+            item.innerHTML = `
+                <strong>${escapeHtml(comment.authorName || "")}</strong>
+                <p>${escapeHtml(comment.text || "")}</p>
+            `;
+
+            list.appendChild(item);
+        });
+    }
+
+    showView("projectComments");
+}
+
+async function addComment() {
+    const text = document.getElementById("newCommentText").value.trim();
+    const message = document.getElementById("commentMessage");
+
+    if (!text) {
+        message.textContent = "Komentarz nie może być pusty.";
+        message.className = "form-message error";
+        return;
+    }
+
+    const commentData = {
+        id: Date.now(),
+        projectId: currentProjectId,
+        teamId: currentTeam?.id,
+        authorName: currentTeam?.name || "",
+        text: text
+    };
+
+    const savedComment = await saveCommentToBackend(commentData);
+
+    projectComments.unshift(savedComment);
+
+    document.getElementById("newCommentText").value = "";
+    showProjectComments();
+}
+
+function showProjectGuidelines(projectId = currentProjectId) {
+    const project = availableProjects.find(item => item.id === projectId);
+
+    if (!project) {
+        return;
+    }
+
+    document.getElementById("guidelinesTopic").textContent = project.topic || "";
+    document.getElementById("guidelinesCompany").textContent = project.companyName || "";
+    document.getElementById("guidelinesDescription").textContent = project.description || "";
+    document.getElementById("guidelinesGoal").textContent = project.goal || "";
+    document.getElementById("guidelinesWorkScope").textContent = project.workScope || "";
+    document.getElementById("guidelinesTechResources").textContent = project.techResources || "";
+
+    renderGuidelineTags(project.tags || []);
+
+    showView("projectGuidelines");
+}
+
+function renderGuidelineTags(tags) {
+    const container = document.getElementById("guidelinesTags");
+    container.innerHTML = "";
+
+    if (!tags || tags.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak tagów.</p>";
+        return;
+    }
+
+    tags.forEach(tag => {
+        const span = document.createElement("span");
+        span.textContent = tag;
+        container.appendChild(span);
+    });
+}
+
+function showRepository() {
+    renderRepositoryFiles();
+    showView("repository");
+}
+
+function renderRepositoryFiles() {
+    const fileList = document.getElementById("repositoryFiles");
+
+    fileList.innerHTML = "";
+
+    if (repositoryFiles.length === 0) {
+        fileList.innerHTML = "<li class='empty-state'>Brak plików do wyświetlenia.</li>";
+        return;
+    }
+
+    repositoryFiles.forEach(file => {
+        const li = document.createElement("li");
+        li.textContent = file.name || "";
+        fileList.appendChild(li);
+    });
+}
+
+function isCurrentStudentLeader() {
+    if (!currentTeam || !currentTeam.members) {
+        return false;
+    }
+
+    const currentMember = currentTeam.members.find(member => member.id === studentData.id);
+
+    return currentMember?.role === "leader";
+}
+
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+loadInitialData();
+</script>
+
+</body>
+</html>
