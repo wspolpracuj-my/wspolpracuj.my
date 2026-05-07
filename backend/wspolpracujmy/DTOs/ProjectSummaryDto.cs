@@ -1,6 +1,4 @@
-using System;
-
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// Skrócone informacje o projekcie do wyświetlania na listach.

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Services

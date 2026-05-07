@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 using wspolpracujmy.Services;
 
@@ -52,7 +53,7 @@ namespace wspolpracujmy.Controllers
         /// </summary>
         /// <param name="dto">Dane potrzebne do utworzenia projektu.</param>
         /// <returns>Utworzony projekt z kodem 201 Created.</returns>
-        public async Task<ActionResult<Project>> Post([FromBody] Models.CreateProjectDto dto)
+        public async Task<ActionResult<Project>> Post([FromBody] CreateProjectDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -99,7 +100,7 @@ namespace wspolpracujmy.Controllers
         /// <param name="id">Id projektu do aktualizacji.</param>
         /// <param name="dto">Dane aktualizacyjne projektu.</param>
         /// <returns>Brak treści (204) gdy zakończono pomyślnie.</returns>
-        public async Task<IActionResult> Put(int id, [FromBody] Models.CreateProjectDto dto)
+        public async Task<IActionResult> Put(int id, [FromBody] CreateProjectDto dto)
         {
             if (id <= 0) return BadRequest("id must be greater than 0");
             if (!ModelState.IsValid)
@@ -200,6 +201,36 @@ namespace wspolpracujmy.Controllers
                 .ToListAsync();
 
             return Ok(groups);
+        }
+
+        [HttpDelete("{projectId:int}/groups/{groupId:int}")]
+        /// <summary>
+        /// Usuwa powiązanie grupy z projektu (nie usuwa projektu ani grupy).
+        /// </summary>
+        /// <param name="projectId">Id projektu.</param>
+        /// <param name="groupId">Id grupy do odpięcia od projektu.</param>
+        /// <returns>Brak treści (204) lub odpowiedni kod błędu.</returns>
+        public async Task<IActionResult> RemoveGroupFromProject(int projectId, int groupId)
+        {
+            if (projectId <= 0 || groupId <= 0)
+                return BadRequest("projectId and groupId must be greater than 0");
+
+            var projectExists = await _db.Projects.AnyAsync(p => p.Id == projectId);
+            if (!projectExists) return NotFound($"Project with id {projectId} not found.");
+
+            var group = await _db.Groups.FindAsync(groupId);
+            if (group == null) return NotFound($"Group with id {groupId} not found.");
+
+            if (group.ProjectId != projectId)
+                return BadRequest("Group is not assigned to the specified project.");
+
+            group.ProjectId = null;
+            group.Project = null;
+
+            _db.Groups.Update(group);
+            await _db.SaveChangesAsync();
+
+            return NoContent();
         }
 
         [HttpGet("{id:int}/details")]

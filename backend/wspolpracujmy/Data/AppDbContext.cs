@@ -112,19 +112,43 @@ namespace wspolpracujmy.Data
                 .HasOne(s => s.Group)
                 .WithMany(g => g.Members)
                 .HasForeignKey(s => s.GroupId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Group>()
                 .HasOne(g => g.Project)
                 .WithMany(p => p.Groups)
                 .HasForeignKey(g => g.ProjectId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Group>()
                 .HasOne(g => g.Leader)
                 .WithMany()
                 .HasForeignKey(g => g.LeaderId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Group)
+                .WithMany(g => g.GroupRequests)
+                .HasForeignKey(gr => gr.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Project)
+                .WithMany(p => p.GroupRequests)
+                .HasForeignKey(gr => gr.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Student)
+                .WithMany(s => s.GroupRequests)
+                .HasForeignKey(gr => gr.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(gr => gr.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Project>()
                 .HasOne(p => p.Company)

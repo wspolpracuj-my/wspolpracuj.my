@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using wspolpracujmy.Models;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO używane przy tworzeniu nowego projektu.

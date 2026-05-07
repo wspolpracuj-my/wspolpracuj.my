@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 
 namespace wspolpracujmy.Models
@@ -20,7 +21,7 @@ namespace wspolpracujmy.Models
         public int UserId { get; set; }
 
         [Column("group_id")]
-        public int GroupId { get; set; }
+        public int? GroupId { get; set; }
 
         [Required]
         [Column("email")]
@@ -30,6 +31,9 @@ namespace wspolpracujmy.Models
         public required User User { get; set; }
 
         [JsonIgnore]
-        public required Group Group { get; set; }
+        public Group? Group { get; set; }
+
+        [JsonIgnore]
+        public ICollection<GroupRequest> GroupRequests { get; set; } = new List<GroupRequest>();
     }
 }

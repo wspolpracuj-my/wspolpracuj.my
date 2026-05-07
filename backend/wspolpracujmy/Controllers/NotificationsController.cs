@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Controllers

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO używane do tworzenia nowego komentarza.

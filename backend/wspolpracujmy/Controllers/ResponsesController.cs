@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Controllers
@@ -75,7 +76,7 @@ namespace wspolpracujmy.Controllers
                 CommentId = dto.CommentId,
                 UserId = dto.UserId,
                 Content = dto.Content,
-                CreatedAt = System.DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
                 Comment = comment,
                 User = user
             };

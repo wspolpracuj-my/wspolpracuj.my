@@ -76,6 +76,9 @@ namespace wspolpracujmy.Models
         public ICollection<Group> Groups { get; set; } = new List<Group>();
 
         [JsonIgnore]
+        public ICollection<GroupRequest> GroupRequests { get; set; } = new List<GroupRequest>();
+
+        [JsonIgnore]
         public ICollection<ProjectTag> ProjectTags { get; set; } = new List<ProjectTag>();
 
         [JsonIgnore]

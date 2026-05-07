@@ -52,12 +52,17 @@ namespace wspolpracujmy.Data
                 var u3 = new User { Id = 3, Name = "Student", Surname = "One", Role = Role.Student, Login = "student1", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student1") };
                 var u4 = new User { Id = 4, Name = "Student", Surname = "Two", Role = Role.Student, Login = "student2", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student2") };
                 var u5 = new User { Id = 5, Name = "Student", Surname = "Three", Role = Role.Student, Login = "student3", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student3") };
-                await context.Users.AddRangeAsync(u1, u2, u3, u4, u5);
+                // Additional test users: one student without a group, and one company without projects
+                var u6 = new User { Id = 6, Name = "Student", Surname = "NoGroup", Role = Role.Student, Login = "student4", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student4") };
+                var u7 = new User { Id = 7, Name = "SoloCompany", Surname = "NoProject", Role = Role.Company, Login = "firma3", PasswordHash = BCrypt.Net.BCrypt.HashPassword("firma3") };
+                await context.Users.AddRangeAsync(u1, u2, u3, u4, u5, u6, u7);
 
                 // Companies
                 var c1 = new Company { Id = 1, UserId = 1, CompanyName = "Firma Innowacji", ContactEmail = "contact@firma1.example", User = u1 };
                 var c2 = new Company { Id = 2, UserId = 2, CompanyName = "TechLabs", ContactEmail = "hello@techlabs.example", User = u2 };
-                await context.Companies.AddRangeAsync(c1, c2);
+                // Company without any projects (to test edge cases)
+                var c3 = new Company { Id = 3, UserId = 7, CompanyName = "SoloCompany", ContactEmail = "contact@solo.example", User = u7 };
+                await context.Companies.AddRangeAsync(c1, c2, c3);
 
                 // Meeting types
                 var mtOnline = new MeetingType { Id = 1, Type = "Online" };
@@ -119,7 +124,9 @@ namespace wspolpracujmy.Data
                 var s1 = new Student { Id = 1, UserId = u3.Id, GroupId = g1.Id, Email = "student1@example.com", User = u3, Group = g1 };
                 var s2 = new Student { Id = 2, UserId = u4.Id, GroupId = g2.Id, Email = "student2@example.com", User = u4, Group = g2 };
                 var s3 = new Student { Id = 3, UserId = u5.Id, GroupId = g1.Id, Email = "student3@example.com", User = u5, Group = g1 };
-                await context.Students.AddRangeAsync(s1, s2, s3);
+                // Student record without a group (GroupId = null)
+                var s4 = new Student { Id = 4, UserId = u6.Id, GroupId = null, Email = "student4@example.com", User = u6, Group = null };
+                await context.Students.AddRangeAsync(s1, s2, s3, s4);
                 await context.SaveChangesAsync();
 
                 // ProjectTags (many-to-many)
@@ -169,8 +176,13 @@ namespace wspolpracujmy.Data
                 {
                     Id = 1,
                     GroupId = g1.Id,
+                    ProjectId = g1.ProjectId,
                     StudentId = s3.Id,
                     CreatedByUserId = s3.UserId,
+                    Group = g1,
+                    Project = p1,
+                    Student = s3,
+                    CreatedByUser = u5,
                     Status = GroupStatus.Accepted,
                     Type = "join_request",
                     CreatedAt = now,

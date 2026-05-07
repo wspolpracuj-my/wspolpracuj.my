@@ -11,7 +11,8 @@ namespace wspolpracujmy.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Ensure the sequence for Notifications.id is advanced to at least the current max id
-            migrationBuilder.Sql("SELECT setval(pg_get_serial_sequence('\"Notifications\"','id'), (SELECT COALESCE(MAX(id),0) FROM \"Notifications\"));");
+            // Use +1 and set is_called=false so the next insert yields max(id)+1, and avoid setting sequence to 0.
+            migrationBuilder.Sql("SELECT setval(pg_get_serial_sequence('\"Notifications\"','id'), COALESCE((SELECT MAX(id) FROM \"Notifications\"),0) + 1, false);");
 
         }
 

@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Controllers
@@ -64,13 +66,49 @@ namespace wspolpracujmy.Controllers
         /// <summary>
         /// Tworzy nową grupę w bazie danych.
         /// </summary>
-        /// <param name="group">Obiekt grupy do utworzenia.</param>
+        /// <param name="dto">DTO zawierające dane grupy do utworzenia.</param>
         /// <returns>Utworzona grupa z kodem 201 Created.</returns>
-        public async Task<ActionResult<Group>> Post(Group group)
+        public async Task<ActionResult<CreateGroupResultDto>> Post([FromBody] CreateGroupDto dto)
         {
+            if (dto == null) return BadRequest();
+            if (string.IsNullOrWhiteSpace(dto.Name)) return BadRequest("Name is required.");
+
+            var leader = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == dto.LeaderId);
+            if (leader == null) return NotFound($"Student with id {dto.LeaderId} not found.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var group = new Group
+            {
+                Name = dto.Name,
+                LeaderId = leader.Id,
+                Members = new List<Student>(),
+                GroupRequests = new List<GroupRequest>(),
+                GroupFiles = new List<GroupFile>(),
+                CalendarEvents = new List<CalendarEvent>()
+            };
+
             _db.Groups.Add(group);
             await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(Get), new { id = group.Id }, group);
+
+            leader.GroupId = group.Id;
+            leader.Group = group;
+            group.Leader = leader;
+            _db.Students.Update(leader);
+            await _db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            var response = new CreateGroupResultDto
+            {
+                Id = group.Id,
+                Name = group.Name,
+                ProjectId = group.ProjectId,
+                LeaderId = group.LeaderId,
+                MemberCount = 1
+            };
+
+            return CreatedAtAction(nameof(Get), new { id = group.Id }, response);
         }
 
         [HttpPatch("{id:int}")]
@@ -112,6 +150,64 @@ namespace wspolpracujmy.Controllers
             return NoContent();
         }
 
+        [HttpDelete("{groupId:int}/members/{studentId:int}")]
+        [Authorize]
+        /// <summary>
+        /// Usuwa studenta z grupy. Tylko lider grupy lub administrator mogą wykonać tę akcję.
+        /// </summary>
+        /// <param name="groupId">Id grupy.</param>
+        /// <param name="studentId">Id studenta do usunięcia z grupy.</param>
+        /// <returns>Brak treści (204) lub odpowiedni kod błędu.</returns>
+        public async Task<IActionResult> RemoveMemberFromGroup(int groupId, int studentId)
+        {
+            if (groupId <= 0 || studentId <= 0)
+                return BadRequest("groupId and studentId must be greater than 0");
+
+            var group = await _db.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == groupId);
+            if (group == null) return NotFound($"Group with id {groupId} not found.");
+
+            // get current user id from claims
+            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            var isAdmin = currentUser.Role == Models.Role.Admin;
+
+            var currentStudent = await _db.Students.FirstOrDefaultAsync(s => s.UserId == currentUserId);
+            var isLeader = currentStudent != null && group.LeaderId.HasValue && currentStudent.Id == group.LeaderId.Value;
+
+            if (!isAdmin && !isLeader)
+                return Forbid("Only group leader or admin can remove members.");
+
+            var targetStudent = await _db.Students.FindAsync(studentId);
+            if (targetStudent == null) return NotFound($"Student with id {studentId} not found.");
+
+            if (!targetStudent.GroupId.HasValue || targetStudent.GroupId.Value != groupId)
+                return BadRequest("Student is not a member of this group.");
+
+            // If removing the leader, prevent a leader from removing themselves.
+            // Admins can still remove the leader.
+            if (group.LeaderId.HasValue && group.LeaderId.Value == targetStudent.Id)
+            {
+                if (isLeader && !isAdmin)
+                    return BadRequest("Group leader cannot remove themselves; delete the group instead.");
+
+                group.LeaderId = null;
+            }
+
+            targetStudent.GroupId = null;
+
+            _db.Students.Update(targetStudent);
+            _db.Groups.Update(group);
+            await _db.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         [HttpGet("project/{projectId:int}/summary")]
         /// <summary>
         /// Zwraca podsumowania grup (z członkami) dla zadanego projektu.
@@ -133,10 +229,12 @@ namespace wspolpracujmy.Controllers
                 {
                     Id = g.Id,
                     Name = g.Name,
+                    LeaderId = g.LeaderId ?? 0,
+                    MemberCount = g.Members.Count,
                     Members = g.Members.Select(m => new MemberSummaryDto
                     {
                         Id = m.Id,
-                        UserName = m.User.Name + " " + m.User.Surname
+                        UserName = m.User.Name + " " + m.User.Surname,
                     }).ToList()
                 })
                 .ToListAsync();
@@ -162,10 +260,12 @@ namespace wspolpracujmy.Controllers
                 {
                     Id = g.Id,
                     Name = g.Name,
+                    LeaderId = g.LeaderId ?? 0,
+                    MemberCount = g.Members.Count,
                     Members = g.Members.Select(m => new MemberSummaryDto
                     {
                         Id = m.Id,
-                        UserName = m.User.Name + " " + m.User.Surname
+                        UserName = m.User.Name + " " + m.User.Surname,
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();

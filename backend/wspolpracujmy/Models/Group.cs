@@ -20,13 +20,11 @@ namespace wspolpracujmy.Models
         [Column("name")]
         public required string Name { get; set; }
 
-        [Required]
         [Column("project_id")]
-        public int ProjectId { get; set; }
+        public int? ProjectId { get; set; }
 
-        [Required]
         [Column("is_accepted")]
-        public required GroupStatus IsAccepted { get; set; }
+        public GroupStatus? IsAccepted { get; set; }
 
         [Column("leader_id")]
         public int? LeaderId { get; set; }
@@ -34,10 +32,13 @@ namespace wspolpracujmy.Models
         // `NumberOfMembers` is removed; compute members count from `Members` relationship instead.
 
         [JsonIgnore]
-        public required Project Project { get; set; }
+        public Project? Project { get; set; }
 
         [JsonIgnore]
         public Student? Leader { get; set; }
+
+        [JsonIgnore]
+        public ICollection<GroupRequest> GroupRequests { get; set; } = new List<GroupRequest>();
 
         [JsonIgnore]
         public ICollection<Student> Members { get; set; } = new List<Student>();

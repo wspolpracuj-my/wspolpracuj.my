@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Controllers
@@ -37,6 +38,29 @@ namespace wspolpracujmy.Controllers
         //     if (s == null) return NotFound();
         //     return s;
         // }
+
+        [HttpGet("{id:int}")]
+        /// <summary>
+        /// Pobiera studenta po identyfikatorze w postaci DTO.
+        /// </summary>
+        /// <param name="id">Id studenta.</param>
+        /// <returns>StudentDto lub NotFound jeśli nie istnieje.</returns>
+        public async Task<ActionResult<StudentDto>> Get(int id)
+        {
+            var student = await _db.Students
+                .Where(s => s.Id == id)
+                .Select(s => new StudentDto
+                {
+                    Id = s.Id,
+                    UserId = s.UserId,
+                    GroupId = s.GroupId,
+                    Email = s.Email
+                })
+                .FirstOrDefaultAsync();
+
+            if (student == null) return NotFound();
+            return Ok(student);
+        }
 
         // [HttpPost]
         // /// <summary>

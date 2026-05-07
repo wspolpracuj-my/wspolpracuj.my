@@ -1,4 +1,4 @@
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// Skrócone informacje o firmie do wyświetlania w listach.

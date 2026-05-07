@@ -1,6 +1,7 @@
 using System;
+using wspolpracujmy.Models;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     public class NotificationDto
     {

@@ -1,6 +1,6 @@
 using System;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO przedstawiające odpowiedź w formacie do serializacji/odpowiedzi API.

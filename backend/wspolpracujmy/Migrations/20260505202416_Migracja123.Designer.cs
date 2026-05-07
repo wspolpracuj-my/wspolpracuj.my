@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using wspolpracujmy.Data;
@@ -11,9 +12,11 @@ using wspolpracujmy.Data;
 namespace wspolpracujmy.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260505202416_Migracja123")]
+    partial class Migracja123
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -176,6 +179,7 @@ namespace wspolpracujmy.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("IsAccepted")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("is_accepted");
 
@@ -188,7 +192,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.Property<int?>("ProjectId")
+                    b.Property<int>("ProjectId")
                         .HasColumnType("integer")
                         .HasColumnName("project_id");
 
@@ -239,10 +243,6 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
-                    b.Property<int?>("ProjectId")
-                        .HasColumnType("integer")
-                        .HasColumnName("project_id");
-
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("responded_at");
@@ -252,7 +252,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<int?>("StudentId")
+                    b.Property<int>("StudentId")
                         .HasColumnType("integer")
                         .HasColumnName("student_id");
 
@@ -261,14 +261,6 @@ namespace wspolpracujmy.Migrations
                         .HasColumnName("type");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("StudentId");
 
                     b.ToTable("GroupRequests", (string)null);
                 });
@@ -474,7 +466,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("email");
 
-                    b.Property<int?>("GroupId")
+                    b.Property<int>("GroupId")
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
@@ -615,7 +607,8 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Project", "Project")
                         .WithMany("Groups")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Leader");
 
@@ -639,39 +632,6 @@ namespace wspolpracujmy.Migrations
                     b.Navigation("File");
 
                     b.Navigation("Group");
-                });
-
-            modelBuilder.Entity("wspolpracujmy.Models.GroupRequest", b =>
-                {
-                    b.HasOne("wspolpracujmy.Models.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("wspolpracujmy.Models.Group", "Group")
-                        .WithMany("GroupRequests")
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("wspolpracujmy.Models.Project", "Project")
-                        .WithMany("GroupRequests")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("wspolpracujmy.Models.Student", "Student")
-                        .WithMany("GroupRequests")
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Group");
-
-                    b.Navigation("Project");
-
-                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("wspolpracujmy.Models.Notification", b =>
@@ -747,7 +707,8 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Group", "Group")
                         .WithMany("Members")
                         .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithOne("Student")
@@ -776,8 +737,6 @@ namespace wspolpracujmy.Migrations
 
                     b.Navigation("GroupFiles");
 
-                    b.Navigation("GroupRequests");
-
                     b.Navigation("Members");
                 });
 
@@ -785,16 +744,9 @@ namespace wspolpracujmy.Migrations
                 {
                     b.Navigation("Comments");
 
-                    b.Navigation("GroupRequests");
-
                     b.Navigation("Groups");
 
                     b.Navigation("ProjectTags");
-                });
-
-            modelBuilder.Entity("wspolpracujmy.Models.Student", b =>
-                {
-                    b.Navigation("GroupRequests");
                 });
 
             modelBuilder.Entity("wspolpracujmy.Models.Tag", b =>

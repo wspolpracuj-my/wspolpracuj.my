@@ -20,11 +20,26 @@ namespace wspolpracujmy.Models
         [Column("group_id")]
         public int GroupId { get; set; }
 
+        [JsonIgnore]
+        public required Group Group { get; set; }
+
+        [Column("project_id")]
+        public int? ProjectId { get; set; }
+
+        [JsonIgnore]
+        public Project? Project { get; set; }
+
         [Column("student_id")]
-        public int StudentId { get; set; }
+        public int? StudentId { get; set; }
+
+        [JsonIgnore]
+        public Student? Student { get; set; }
 
         [Column("created_by_user_id")]
         public int CreatedByUserId { get; set; }
+
+        [JsonIgnore]
+        public User? CreatedByUser { get; set; }
 
         [Column("status")]
         public GroupStatus Status { get; set; } = GroupStatus.Pending;

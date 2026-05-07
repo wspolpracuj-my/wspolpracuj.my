@@ -29,8 +29,15 @@ namespace wspolpracujmy.Controllers
                 return BadRequest(new { message = "Login already exists" });
             }
 
+            if (request.Role == Role.Student && await _context.Students.AnyAsync(s => s.Email == request.Email))
+            {
+                return BadRequest(new { message = "Student email already exists" });
+            }
+
             // Hashowanie hasła
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
             var user = new User
             {
@@ -43,6 +50,22 @@ namespace wspolpracujmy.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+
+            if (user.Role == Role.Student)
+            {
+                var student = new Student
+                {
+                    UserId = user.Id,
+                    GroupId = null,
+                    Email = request.Email,
+                    User = user
+                };
+
+                _context.Students.Add(student);
+                await _context.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
 
             // Generuj token
             var token = _jwtTokenService.GenerateToken(user);

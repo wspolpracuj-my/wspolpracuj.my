@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using wspolpracujmy.Models;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO zawierające szczegółowe informacje o projekcie.
