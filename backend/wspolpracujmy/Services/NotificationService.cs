@@ -13,7 +13,7 @@ namespace wspolpracujmy.Services
         private readonly AppDbContext _db;
         public NotificationService(AppDbContext db) => _db = db;
 
-        public async Task<Notification> CreateNotificationAsync(int userId, string content, string? linkTarget = null)
+        public async Task<Notification> CreateNotificationAsync(int userId, string content, string? linkTarget = null, int? groupRequestId = null)
         {
             // Dedupe: avoid creating repeated identical notifications for the same user
             // within a short time window. This prevents spamming when events fire multiple
@@ -23,7 +23,7 @@ namespace wspolpracujmy.Services
             var cutoff = now - window;
 
             var existing = await _db.Notifications
-                .Where(n => n.UserId == userId && n.Content == content && n.LinkTarget == linkTarget && n.CreatedAt >= cutoff)
+                .Where(n => n.UserId == userId && n.Content == content && n.LinkTarget == linkTarget && n.GroupRequestId == groupRequestId && n.CreatedAt >= cutoff)
                 .OrderByDescending(n => n.CreatedAt)
                 .FirstOrDefaultAsync();
 
@@ -40,7 +40,8 @@ namespace wspolpracujmy.Services
                 Content = content,
                 Status = NotificationStatus.NotRead,
                 CreatedAt = now,
-                LinkTarget = linkTarget
+                LinkTarget = linkTarget,
+                GroupRequestId = groupRequestId
             };
             _db.Notifications.Add(n);
             await _db.SaveChangesAsync();
@@ -74,6 +75,16 @@ namespace wspolpracujmy.Services
         public async Task MarkAsReadAsync(System.Collections.Generic.IEnumerable<int> ids)
         {
             var list = await _db.Notifications.Where(n => ids.Contains(n.Id)).ToListAsync();
+            if (list.Count == 0) return;
+            foreach (var it in list) it.Status = NotificationStatus.Read;
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task MarkAsReadForUserAsync(int userId, System.Collections.Generic.IEnumerable<int> ids)
+        {
+            var list = await _db.Notifications
+                .Where(n => ids.Contains(n.Id) && n.UserId == userId)
+                .ToListAsync();
             if (list.Count == 0) return;
             foreach (var it in list) it.Status = NotificationStatus.Read;
             await _db.SaveChangesAsync();

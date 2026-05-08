@@ -19,7 +19,8 @@ namespace wspolpracujmy.Models
     {
         Pending,
         Accepted,
-        Declined
+        Declined,
+        Cancelled
     }
 
     /// <summary>

@@ -6,7 +6,8 @@ namespace wspolpracujmy.DTOs
     public class ProjectSummaryDto
     {
         public int Id { get; set; }
-        public string Topic { get; set; } = string.Empty;
+        public required string Topic { get; set; }
+        public required string CompanyName { get; set; }
         public int CurrentGroupsCount { get; set; }
         public int MaxGroups { get; set; }
     }

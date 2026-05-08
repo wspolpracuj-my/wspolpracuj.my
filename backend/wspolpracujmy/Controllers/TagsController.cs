@@ -10,7 +10,7 @@ namespace wspolpracujmy.Controllers
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do pobierania tagów używanych przez projekty.
+    /// Kontroler do zarządzania tagami projektów.
     /// </summary>
     public class TagsController : ControllerBase
     {

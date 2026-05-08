@@ -10,7 +10,7 @@ namespace wspolpracujmy.Controllers
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do pobierania typów spotkań dostępnych w aplikacji.
+    /// Kontroler typów spotkań (formaty spotkań/projektów).
     /// </summary>
     public class MeetingTypesController : ControllerBase
     {

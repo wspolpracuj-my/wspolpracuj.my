@@ -5,7 +5,8 @@ namespace wspolpracujmy.DTOs
     /// Pola:
     /// - GroupId: id grupy docelowej (wymagane).
     /// - ProjectId: id projektu (opcjonalne) — wymagane przy typie "ProjectRequest".
-    /// - TargetStudentId: id studenta będącego celem zaproszenia (opcjonalne) — wymagane przy typie "Invitation".
+    /// - TargetStudentId: DO NOT PROVIDE — this field is set/used by server only.
+    /// - TargetEmail: email studenta będącego celem zaproszenia (wymagane dla typu "Invitation").
     /// - Type: typ żądania: "Invitation", "ProjectRequest" lub "Application".
     /// Uwaga: `CreatedByUserId` nie jest przekazywane w DTO — pobierane jest z aktualnie zalogowanego użytkownika po stronie serwera.
     /// </summary>
@@ -13,7 +14,7 @@ namespace wspolpracujmy.DTOs
     {
         public int GroupId { get; set; }
         public int? ProjectId { get; set; }
-        public int? TargetStudentId { get; set; }
+        public string? TargetEmail { get; set; }
         public string? Type { get; set; }
     }
 }

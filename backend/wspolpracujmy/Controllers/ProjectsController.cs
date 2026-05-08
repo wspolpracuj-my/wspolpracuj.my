@@ -14,13 +14,14 @@ namespace wspolpracujmy.Controllers
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do zarządzania projektami, podsumowaniami i powiązanymi zasobami.
+    /// Kontroler do zarządzania projektami i ich podsumowaniami.
     /// </summary>
     public class ProjectsController : ControllerBase
     {
         private readonly AppDbContext _db;
         private readonly ProjectService _projectService;
         private readonly ProjectCommentService _projectCommentService;
+        private readonly wspolpracujmy.Services.GroupAuthorizationService _groupAuth;
 
         /// <summary>
         /// Tworzy kontroler projektów z wymaganymi zależnościami.
@@ -28,11 +29,12 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         /// <param name="projectService">Serwis do pobierania podsumowań projektów.</param>
         /// <param name="projectCommentService">Serwis obsługi komentarzy projektów.</param>
-        public ProjectsController(AppDbContext db, ProjectService projectService, ProjectCommentService projectCommentService)
+        public ProjectsController(AppDbContext db, ProjectService projectService, ProjectCommentService projectCommentService, wspolpracujmy.Services.GroupAuthorizationService groupAuth)
         {
             _db = db;
             _projectService = projectService;
             _projectCommentService = projectCommentService;
+            _groupAuth = groupAuth;
         }
 
         [HttpGet]
@@ -48,6 +50,7 @@ namespace wspolpracujmy.Controllers
 
         // trzebazmienickoniecznie
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CompanyOnly")]
         /// <summary>
         /// Tworzy nowy projekt na podstawie danych DTO.
         /// </summary>
@@ -58,14 +61,25 @@ namespace wspolpracujmy.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            // If caller is a Company, derive CompanyId from their user account; Admin may provide CompanyId in DTO.
+            var role = wspolpracujmy.Services.GroupAuthorizationService.GetRoleFromClaims(User);
+            var userIdMaybe = wspolpracujmy.Services.GroupAuthorizationService.GetUserIdFromClaims(User);
+            if (role == "Company")
+            {
+                if (!userIdMaybe.HasValue) return Unauthorized();
+                var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userIdMaybe.Value);
+                if (companyForUser == null) return Forbid();
+                dto.CompanyId = companyForUser.Id;
+            }
+
             // load related entities
             var company = await _db.Companies.FindAsync(dto.CompanyId);
             if (company == null)
-                return NotFound($"Company with id {dto.CompanyId} not found.");
+                return NotFound($"Firma o id {dto.CompanyId} nie została znaleziona.");
 
             var meetingType = await _db.Meeting_types.FindAsync(dto.MeetingTypeId);
             if (meetingType == null)
-                return NotFound($"MeetingType with id {dto.MeetingTypeId} not found.");
+                return NotFound($"Typ spotkania o id {dto.MeetingTypeId} nie został znaleziony.");
 
             var project = new Project
             {
@@ -94,6 +108,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CompanyOnly")]
         /// <summary>
         /// Aktualizuje istniejący projekt na podstawie DTO.
         /// </summary>
@@ -102,21 +117,33 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) gdy zakończono pomyślnie.</returns>
         public async Task<IActionResult> Put(int id, [FromBody] CreateProjectDto dto)
         {
-            if (id <= 0) return BadRequest("id must be greater than 0");
+            if (id <= 0) return BadRequest("Parametr id musi być większy niż 0.");
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var project = await _db.Projects.FindAsync(id);
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == id);
             if (project == null) return NotFound();
 
-            // load related entities
+            // Authorization: companies can only update their own projects; admins can update any
+            var role = wspolpracujmy.Services.GroupAuthorizationService.GetRoleFromClaims(User);
+            var userIdMaybe = wspolpracujmy.Services.GroupAuthorizationService.GetUserIdFromClaims(User);
+            if (role == "Company")
+            {
+                if (!userIdMaybe.HasValue) return Unauthorized();
+                var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userIdMaybe.Value);
+                if (companyForUser == null) return Forbid();
+                if (project.CompanyId != companyForUser.Id) return Forbid();
+                // ensure dto.CompanyId stays with this company
+                dto.CompanyId = companyForUser.Id;
+            }
+            // admins may provide dto.CompanyId to reassign project
             var company = await _db.Companies.FindAsync(dto.CompanyId);
             if (company == null)
-                return NotFound($"Company with id {dto.CompanyId} not found.");
+                return NotFound($"Firma o id {dto.CompanyId} nie została znaleziona.");
 
             var meetingType = await _db.Meeting_types.FindAsync(dto.MeetingTypeId);
             if (meetingType == null)
-                return NotFound($"MeetingType with id {dto.MeetingTypeId} not found.");
+                return NotFound($"Typ spotkania o id {dto.MeetingTypeId} nie został znaleziony.");
 
             // update fields
             project.CompanyId = dto.CompanyId;
@@ -142,6 +169,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CompanyOnly")]
         /// <summary>
         /// Usuwa projekt o podanym identyfikatorze.
         /// </summary>
@@ -149,8 +177,19 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) lub NotFound.</returns>
         public async Task<IActionResult> Delete(int id)
         {
-            var p = await _db.Projects.FindAsync(id);
+            var p = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == id);
             if (p == null) return NotFound();
+
+            var role = wspolpracujmy.Services.GroupAuthorizationService.GetRoleFromClaims(User);
+            var userIdMaybe = wspolpracujmy.Services.GroupAuthorizationService.GetUserIdFromClaims(User);
+            if (role == "Company")
+            {
+                if (!userIdMaybe.HasValue) return Unauthorized();
+                var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userIdMaybe.Value);
+                if (companyForUser == null) return Forbid();
+                if (p.CompanyId != companyForUser.Id) return Forbid();
+            }
+
             _db.Projects.Remove(p);
             await _db.SaveChangesAsync();
             return NoContent();
@@ -165,7 +204,7 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<List<ProjectSummaryDto>>> GetSummary([FromQuery] int companyId)
         {
             if (companyId <= 0)
-                return BadRequest("companyId must be provided and greater than 0");
+                return BadRequest("Parametr companyId musi być podany i większy niż 0.");
 
             var summaries = await _projectService.GetProjectsForCompanyAsync(companyId);
             return Ok(summaries);
@@ -191,7 +230,7 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<List<Group>>> GetGroupsForProject(int projectId)
         {
             if (projectId <= 0)
-                return BadRequest("projectId must be provided and greater than 0");
+                return BadRequest("Parametr projectId musi być podany i większy niż 0.");
 
             var exists = await _db.Projects.AnyAsync(p => p.Id == projectId);
             if (!exists) return NotFound();
@@ -204,6 +243,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{projectId:int}/groups/{groupId:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CompanyOnly")]
         /// <summary>
         /// Usuwa powiązanie grupy z projektu (nie usuwa projektu ani grupy).
         /// </summary>
@@ -213,16 +253,26 @@ namespace wspolpracujmy.Controllers
         public async Task<IActionResult> RemoveGroupFromProject(int projectId, int groupId)
         {
             if (projectId <= 0 || groupId <= 0)
-                return BadRequest("projectId and groupId must be greater than 0");
+                return BadRequest("Parametry projectId i groupId muszą być większe niż 0.");
 
-            var projectExists = await _db.Projects.AnyAsync(p => p.Id == projectId);
-            if (!projectExists) return NotFound($"Project with id {projectId} not found.");
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return NotFound($"Projekt o id {projectId} nie został znaleziony.");
+
+            var role = wspolpracujmy.Services.GroupAuthorizationService.GetRoleFromClaims(User);
+            var userIdMaybe = wspolpracujmy.Services.GroupAuthorizationService.GetUserIdFromClaims(User);
+            if (role == "Company")
+            {
+                if (!userIdMaybe.HasValue) return Unauthorized();
+                var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userIdMaybe.Value);
+                if (companyForUser == null) return Forbid();
+                if (project.CompanyId != companyForUser.Id) return Forbid();
+            }
 
             var group = await _db.Groups.FindAsync(groupId);
-            if (group == null) return NotFound($"Group with id {groupId} not found.");
+            if (group == null) return NotFound($"Grupa o id {groupId} nie została znaleziona.");
 
             if (group.ProjectId != projectId)
-                return BadRequest("Group is not assigned to the specified project.");
+                return BadRequest("Grupa nie jest przypisana do wskazanego projektu.");
 
             group.ProjectId = null;
             group.Project = null;
@@ -241,13 +291,14 @@ namespace wspolpracujmy.Controllers
         /// <returns>DTO z detalami projektu lub NotFound.</returns>
         public async Task<ActionResult<ProjectDetailsDto>> GetDetails(int id)
         {
-            if (id <= 0) return BadRequest("id must be greater than 0");
+            if (id <= 0) return BadRequest("Parametr id musi być większy niż 0.");
 
             var dto = await _db.Projects
                 .Where(p => p.Id == id)
                 .Select(p => new ProjectDetailsDto
                 {
                     Id = p.Id,
+                    CompanyName = p.Company != null ? p.Company.CompanyName : string.Empty,
                     Topic = p.Topic,
                     ProjectGoal = p.ProjectGoal,
                     WorkScope = p.WorkScope,

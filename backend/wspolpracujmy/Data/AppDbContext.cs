@@ -222,6 +222,13 @@ namespace wspolpracujmy.Data
                 .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Optional FK: link notifications to a GroupRequest when relevant.
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.GroupRequest)
+                .WithMany()
+                .HasForeignKey(n => n.GroupRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<CalendarEvent>()
                 .HasOne(c => c.Group)
                 .WithMany(g => g.CalendarEvents)

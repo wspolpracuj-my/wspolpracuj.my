@@ -7,5 +7,8 @@ namespace wspolpracujmy.DTOs
     {
         public string Name { get; set; } = string.Empty;
         public int LeaderId { get; set; }
+        // Opcjonalny limit członków dla tworzonej grupy. Jeśli nie podano,
+        // można użyć domyślnej wartości z powiązanego projektu.
+        public int? MaxMembers { get; set; }
     }
 }

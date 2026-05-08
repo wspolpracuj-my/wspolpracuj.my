@@ -35,7 +35,13 @@ namespace wspolpracujmy.Models
         [Column("link_target")]
         public string? LinkTarget { get; set; }
 
+        [Column("group_request_id")]
+        public int? GroupRequestId { get; set; }
+
         [JsonIgnore]
-        public required User User { get; set; }
+        public GroupRequest? GroupRequest { get; set; }
+
+        [JsonIgnore]
+        public User? User { get; set; }
     }
 }

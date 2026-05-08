@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using wspolpracujmy.Data;
@@ -11,9 +12,11 @@ using wspolpracujmy.Data;
 namespace wspolpracujmy.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260507210134_AddGroupMaxMembers")]
+    partial class AddGroupMaxMembers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -315,10 +318,6 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int?>("GroupRequestId")
-                        .HasColumnType("integer")
-                        .HasColumnName("group_request_id");
-
                     b.Property<string>("LinkTarget")
                         .HasColumnType("text")
                         .HasColumnName("link_target");
@@ -333,8 +332,6 @@ namespace wspolpracujmy.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("GroupRequestId");
 
                     b.HasIndex("UserId");
 
@@ -686,18 +683,11 @@ namespace wspolpracujmy.Migrations
 
             modelBuilder.Entity("wspolpracujmy.Models.Notification", b =>
                 {
-                    b.HasOne("wspolpracujmy.Models.GroupRequest", "GroupRequest")
-                        .WithMany()
-                        .HasForeignKey("GroupRequestId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("GroupRequest");
 
                     b.Navigation("User");
                 });

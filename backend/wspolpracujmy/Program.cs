@@ -5,6 +5,8 @@ using Microsoft.OpenApi;
 using System.Text;
 using wspolpracujmy.Data;
 using wspolpracujmy.Services;
+using Microsoft.AspNetCore.Authorization;
+using wspolpracujmy.Services.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,8 +55,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<wspolpracujmy.Services.ProjectService>();
 builder.Services.AddScoped<wspolpracujmy.Services.ProjectCommentService>();
 builder.Services.AddScoped<wspolpracujmy.Services.NotificationService>();
+builder.Services.AddScoped<wspolpracujmy.Services.GroupRequestService>();
 
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<GroupAuthorizationService>();
+builder.Services.AddScoped<IAuthorizationHandler, GroupOwnerHandler>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"] ?? throw new ArgumentNullException("SecretKey not configured");
@@ -78,7 +83,12 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CompanyOnly", policy => policy.RequireRole("Company", "Admin"));
+    options.AddPolicy("StudentOnly", policy => policy.RequireRole("Student"));
+    options.AddPolicy("GroupOwner", policy => policy.Requirements.Add(new GroupOwnerRequirement()));
+});
 
 var app = builder.Build();
 
@@ -88,11 +98,15 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
 }
 
+// (dev-only truncation was run temporarily and removed)
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
     // Seed development data (runs only in Development)
+    // First run the dedicated TagsSeeder so tag names are controlled separately.
+    await TagsSeeder.SeedAsync(app);
     await TestDataSeeder.SeedAsync(app);
 }
 

@@ -34,7 +34,7 @@ namespace wspolpracujmy.Controllers
         /// <returns>Lista DTO odpowiedzi.</returns>
         public async Task<ActionResult<List<ResponseDto>>> GetByComment(int commentId)
         {
-            if (commentId <= 0) return BadRequest("commentId must be greater than 0");
+            if (commentId <= 0) return BadRequest("Parametr commentId musi być większy niż 0.");
 
             var exists = await _db.Comments.AnyAsync(c => c.Id == commentId);
             if (!exists) return NotFound();
@@ -56,6 +56,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nową odpowiedź na podstawie DTO.
         /// </summary>
@@ -65,11 +66,20 @@ namespace wspolpracujmy.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            // prevent spoofing: set response author to current user
+            dto.UserId = currentUserId;
+
             var comment = await _db.Comments.FindAsync(dto.CommentId);
-            if (comment == null) return NotFound($"Comment with id {dto.CommentId} not found.");
+            if (comment == null) return NotFound($"Komentarz o id {dto.CommentId} nie został znaleziony.");
 
             var user = await _db.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound($"User with id {dto.UserId} not found.");
+            if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
 
             var response = new Response
             {

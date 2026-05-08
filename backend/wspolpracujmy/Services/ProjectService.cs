@@ -42,6 +42,7 @@ namespace wspolpracujmy.Services
                     {
                         Id = p.Id,
                         Topic = p.Topic,
+                        CompanyName = p.Company != null ? p.Company.CompanyName : string.Empty,
                         CurrentGroupsCount = gs.Count(),
                         MaxGroups = p.MaxGroups ?? 0
                     }
@@ -66,6 +67,7 @@ namespace wspolpracujmy.Services
                     {
                         Id = p.Id,
                         Topic = p.Topic,
+                        CompanyName = p.Company != null ? p.Company.CompanyName : string.Empty,
                         CurrentGroupsCount = gs.Count(),
                         MaxGroups = p.MaxGroups ?? 0
                     }

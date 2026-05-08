@@ -29,6 +29,9 @@ namespace wspolpracujmy.Models
         [Column("leader_id")]
         public int? LeaderId { get; set; }
 
+        [Column("max_members")]
+        public int? MaxMembers { get; set; }
+
         // `NumberOfMembers` is removed; compute members count from `Members` relationship instead.
 
         [JsonIgnore]

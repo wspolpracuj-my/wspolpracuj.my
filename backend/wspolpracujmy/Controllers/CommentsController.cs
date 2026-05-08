@@ -12,7 +12,7 @@ namespace wspolpracujmy.Controllers
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do obsługi komentarzy związanych z projektami.
+    /// Kontroler do obsługi komentarzy projektów i ich odpowiedzi.
     /// </summary>
     public class CommentsController : ControllerBase
     {
@@ -41,7 +41,7 @@ namespace wspolpracujmy.Controllers
         /// <returns>Listę komentarzy z odpowiedziami dla projektu.</returns>
         public async Task<ActionResult<List<CommentWithResponsesDto>>> GetByProject(int projectId)
         {
-            if (projectId <= 0) return BadRequest("projectId must be greater than 0");
+            if (projectId <= 0) return BadRequest("Parametr projectId musi być większy niż 0.");
 
             var exists = await _db.Projects.AnyAsync(p => p.Id == projectId);
             if (!exists) return NotFound();
@@ -59,8 +59,8 @@ namespace wspolpracujmy.Controllers
         /// <returns>Listę komentarzy przypisanych do grupy w projekcie.</returns>
         public async Task<ActionResult<List<CommentWithResponsesDto>>> GetByProjectAndGroup(int projectId, int groupId)
         {
-            if (projectId <= 0) return BadRequest("projectId must be greater than 0");
-            if (groupId <= 0) return BadRequest("groupId must be greater than 0");
+            if (projectId <= 0) return BadRequest("Parametr projectId musi być większy niż 0.");
+            if (groupId <= 0) return BadRequest("Parametr groupId musi być większy niż 0.");
 
             var projectExists = await _db.Projects.AnyAsync(p => p.Id == projectId);
             if (!projectExists) return NotFound();
@@ -72,17 +72,18 @@ namespace wspolpracujmy.Controllers
             return Ok(comments);
         }
 
-/*         [HttpGet("project/{projectId}")]
-        public async Task<ActionResult<IEnumerable<Comment>>> GetByProjectId(int projectId)
-        {
-            var comments = await _db.Comments
-                .Include(c => c.User)
-                .Where(c => c.ProjectId == projectId)
-                .ToListAsync();
-            return comments;
-        } */
+        /*         [HttpGet("project/{projectId}")]
+                public async Task<ActionResult<IEnumerable<Comment>>> GetByProjectId(int projectId)
+                {
+                    var comments = await _db.Comments
+                        .Include(c => c.User)
+                        .Where(c => c.ProjectId == projectId)
+                        .ToListAsync();
+                    return comments;
+                } */
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nowy komentarz na podstawie DTO i zapisuje go w bazie.
         /// </summary>
@@ -91,12 +92,23 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<Comment>> Post([FromBody] CreateCommentDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
+            // authenticate and ensure caller matches dto.UserId (or is Admin)
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+
+            // For non-admins, force comment.UserId to current user and prevent spoofing
+            if (role != "Admin") dto.UserId = currentUserId;
 
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == dto.ProjectId);
-            if (project == null) return NotFound($"Project with id {dto.ProjectId} not found.");
+            if (project == null) return NotFound($"Projekt o id {dto.ProjectId} nie został znaleziony.");
 
             var user = await _db.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound($"User with id {dto.UserId} not found.");
+            if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
 
             var comment = new Comment
             {
@@ -161,6 +173,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Usuwa komentarz o podanym identyfikatorze.
         /// Prawdopodobnie powinno nie istnieć a jedynie admin powienien mieć dostęp do czegoś takiego.
@@ -174,6 +187,18 @@ namespace wspolpracujmy.Controllers
                 .Include(cm => cm.Project)
                 .FirstOrDefaultAsync(cm => cm.Id == id);
             if (c == null) return NotFound();
+            // Authorization: only Admin, comment owner, or owning company may delete
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+
+            var isOwner = c.UserId == currentUserId;
+            var isCompanyOwner = c.Project?.Company != null && c.Project.Company.UserId == currentUserId;
+            if (!(role == "Admin" || isOwner || isCompanyOwner)) return Forbid();
 
             // Best-effort: try to find unread notifications related to this comment's author
             // Notifications created for comments use LinkTarget = "project:{projectId}" and
@@ -209,7 +234,7 @@ namespace wspolpracujmy.Controllers
                     // nothing identifiable — skip deleting notifications
                     _db.Comments.Remove(c);
                     await _db.SaveChangesAsync();
-                    return Ok(new { commentDeleted = true, notificationsRemoved = 0, note = "No author/group information to identify related notifications." });
+                    return Ok(new { commentDeleted = true, notificationsRemoved = 0, note = "Brak informacji o autorze/grupie do identyfikacji powiązanych powiadomień." });
                 }
 
                 var matches = await query.ToListAsync();

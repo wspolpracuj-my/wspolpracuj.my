@@ -70,17 +70,8 @@ namespace wspolpracujmy.Data
                 var mtUniversity = new MeetingType { Id = 3, Type = "UZ" };
                 await context.Meeting_types.AddRangeAsync(mtOnline, mtCompany, mtUniversity);
 
-                // Tags
-                var tags = new[] {
-                    new Tag { Id = 1, Name = "dotnet" },
-                    new Tag { Id = 2, Name = "react" },
-                    new Tag { Id = 3, Name = "backend" },
-                    new Tag { Id = 4, Name = "webapi" },
-                    new Tag { Id = 5, Name = "database" },
-                    new Tag { Id = 6, Name = "startup" },
-                    new Tag { Id = 7, Name = "academic" }
-                };
-                await context.Tags.AddRangeAsync(tags);
+                // Tags are now handled by a dedicated TagsSeeder.
+                // The TestDataSeeder will look up tags in the DB when creating ProjectTags.
 
                 // Projects
                 var p1 = new Project
@@ -130,19 +121,32 @@ namespace wspolpracujmy.Data
                 await context.SaveChangesAsync();
 
                 // ProjectTags (many-to-many)
-                var pt = new[] {
-                    new ProjectTag { ProjectId = p1.Id, TagId = 1, Project = p1, Tag = tags.Single(t => t.Id == 1) }, // dotnet
-                    new ProjectTag { ProjectId = p1.Id, TagId = 3, Project = p1, Tag = tags.Single(t => t.Id == 3) }, // backend
-                    new ProjectTag { ProjectId = p1.Id, TagId = 4, Project = p1, Tag = tags.Single(t => t.Id == 4) }, // webapi
-                    new ProjectTag { ProjectId = p1.Id, TagId = 5, Project = p1, Tag = tags.Single(t => t.Id == 5) }, // database
-                    new ProjectTag { ProjectId = p1.Id, TagId = 7, Project = p1, Tag = tags.Single(t => t.Id == 7) }, // academic
+                // Build ProjectTags by looking up tags by name so the dedicated TagsSeeder can control the tag set.
+                var ptList = new System.Collections.Generic.List<ProjectTag>();
 
-                    new ProjectTag { ProjectId = p2.Id, TagId = 1, Project = p2, Tag = tags.Single(t => t.Id == 1) }, // dotnet
-                    new ProjectTag { ProjectId = p2.Id, TagId = 2, Project = p2, Tag = tags.Single(t => t.Id == 2) }, // react
-                    new ProjectTag { ProjectId = p2.Id, TagId = 3, Project = p2, Tag = tags.Single(t => t.Id == 3) }, // backend
-                    new ProjectTag { ProjectId = p2.Id, TagId = 6, Project = p2, Tag = tags.Single(t => t.Id == 6) }  // startup
-                };
-                await context.ProjectTags.AddRangeAsync(pt);
+                var t_dotnet = await context.Tags.SingleOrDefaultAsync(t => t.Name == "dotnet");
+                var t_backend = await context.Tags.SingleOrDefaultAsync(t => t.Name == "backend");
+                var t_webapi = await context.Tags.SingleOrDefaultAsync(t => t.Name == "webapi");
+                var t_database = await context.Tags.SingleOrDefaultAsync(t => t.Name == "database");
+                var t_academic = await context.Tags.SingleOrDefaultAsync(t => t.Name == "academic");
+                var t_react = await context.Tags.SingleOrDefaultAsync(t => t.Name == "react");
+                var t_startup = await context.Tags.SingleOrDefaultAsync(t => t.Name == "startup");
+
+                if (t_dotnet != null) ptList.Add(new ProjectTag { ProjectId = p1.Id, TagId = t_dotnet.Id, Project = p1, Tag = t_dotnet });
+                if (t_backend != null) ptList.Add(new ProjectTag { ProjectId = p1.Id, TagId = t_backend.Id, Project = p1, Tag = t_backend });
+                if (t_webapi != null) ptList.Add(new ProjectTag { ProjectId = p1.Id, TagId = t_webapi.Id, Project = p1, Tag = t_webapi });
+                if (t_database != null) ptList.Add(new ProjectTag { ProjectId = p1.Id, TagId = t_database.Id, Project = p1, Tag = t_database });
+                if (t_academic != null) ptList.Add(new ProjectTag { ProjectId = p1.Id, TagId = t_academic.Id, Project = p1, Tag = t_academic });
+
+                if (t_dotnet != null) ptList.Add(new ProjectTag { ProjectId = p2.Id, TagId = t_dotnet.Id, Project = p2, Tag = t_dotnet });
+                if (t_react != null) ptList.Add(new ProjectTag { ProjectId = p2.Id, TagId = t_react.Id, Project = p2, Tag = t_react });
+                if (t_backend != null) ptList.Add(new ProjectTag { ProjectId = p2.Id, TagId = t_backend.Id, Project = p2, Tag = t_backend });
+                if (t_startup != null) ptList.Add(new ProjectTag { ProjectId = p2.Id, TagId = t_startup.Id, Project = p2, Tag = t_startup });
+
+                if (ptList.Count > 0)
+                {
+                    await context.ProjectTags.AddRangeAsync(ptList);
+                }
 
                 // Comments
                 var cA = new Comment { Id = 1, UserId = u3.Id, ProjectId = p1.Id, Content = "Fajny projekt, chętnie pomogę.", CreatedAt = DateTime.UtcNow, User = u3, Project = p1 };
@@ -156,8 +160,8 @@ namespace wspolpracujmy.Data
                 await context.Responses.AddRangeAsync(r1, r2);
 
                 // Notifications
-                var n1 = new Notification { Id = 1, UserId = u5.Id, Content = "Twoja prośba o dołączenie została zaakceptowana.", Status = NotificationStatus.NotRead, User = u5, CreatedAt = DateTime.UtcNow };
-                var n2 = new Notification { Id = 2, UserId = u1.Id, Content = "Nowy komentarz do Twojego projektu.", Status = NotificationStatus.NotRead, User = u1, CreatedAt = DateTime.UtcNow };
+                var n1 = new Notification { Id = 1, UserId = u5.Id, Content = "Twoja prośba o dołączenie została zaakceptowana.", Status = NotificationStatus.NotRead, User = u5, CreatedAt = DateTime.UtcNow, GroupRequestId = null };
+                var n2 = new Notification { Id = 2, UserId = u1.Id, Content = "Nowy komentarz do Twojego projektu.", Status = NotificationStatus.NotRead, User = u1, CreatedAt = DateTime.UtcNow, GroupRequestId = null };
                 await context.Notifications.AddRangeAsync(n1, n2);
 
                 // fix group leaders (assign Student objects as leaders) and update groups

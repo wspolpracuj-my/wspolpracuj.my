@@ -9,7 +9,8 @@ namespace wspolpracujmy.DTOs
     public class ProjectDetailsDto
     {
         public int Id { get; set; }
-        public string Topic { get; set; } = string.Empty;
+        public required string Topic { get; set; }
+        public required string CompanyName { get; set; }
         public string? ProjectGoal { get; set; }
         public string? WorkScope { get; set; }
         public string? NeededTechnologies { get; set; }

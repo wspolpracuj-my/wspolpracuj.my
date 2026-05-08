@@ -13,15 +13,20 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    /// <summary>
+    /// Kontroler do zarządzania prośbami grup (Invitation, ProjectRequest, Application).
+    /// </summary>
     public class GroupRequestsController : ControllerBase
     {
         private readonly AppDbContext _db;
         private readonly NotificationService _notifications;
+        private readonly GroupRequestService _groupRequestService;
 
-        public GroupRequestsController(AppDbContext db, NotificationService notifications)
+        public GroupRequestsController(AppDbContext db, NotificationService notifications, GroupRequestService groupRequestService)
         {
             _db = db;
             _notifications = notifications;
+            _groupRequestService = groupRequestService;
         }
 
         [HttpPost]
@@ -31,7 +36,7 @@ namespace wspolpracujmy.Controllers
             if (dto == null) return BadRequest();
 
             var group = await _db.Groups.Include(g => g.Project).Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == dto.GroupId);
-            if (group == null) return NotFound($"Group with id {dto.GroupId} not found.");
+            if (group == null) return NotFound($"Grupa o id {dto.GroupId} nie została znaleziona.");
 
             // current user
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -57,54 +62,107 @@ namespace wspolpracujmy.Controllers
             {
                 // Only leader can invite
                 if (creatorStudent == null || !group.LeaderId.HasValue || creatorStudent.Id != group.LeaderId.Value)
-                    return Forbid("Only the group leader can invite students.");
+                    return Forbid();
 
                 var memberLimit = group.Project != null ? group.Project.MaxNumberGroupMembers : 5;
                 var currentMembers = group.Members?.Count ?? await _db.Students.CountAsync(s => s.GroupId == group.Id);
-                if (currentMembers >= memberLimit) return BadRequest($"Group already has {currentMembers} members which meets/exceeds the limit of {memberLimit}.");
+                if (currentMembers >= memberLimit) return BadRequest($"Grupa ma już {currentMembers} członków, co przekracza limit {memberLimit}.");
 
-                // dto.TargetStudentId was validated by sanitizer
-                var invited = await _db.Students.FindAsync(dto.TargetStudentId.Value);
-                if (invited == null) return NotFound($"Student with id {dto.TargetStudentId.Value} not found.");
-                if (invited.GroupId.HasValue) return BadRequest("Invited student already belongs to a group.");
+                // Resolve target student strictly by email (client should not provide TargetStudentId)
+                if (string.IsNullOrWhiteSpace(dto.TargetEmail))
+                    return BadRequest("Dla typu Invitation pole TargetEmail jest wymagane; nie należy przekazywać TargetStudentId.");
+
+                var email = dto.TargetEmail.Trim().ToLowerInvariant();
+                var invitedByEmail = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Email.ToLower() == email);
+                if (invitedByEmail == null) return NotFound($"Nie znaleziono studenta o adresie e-mail {dto.TargetEmail}.");
+                var invited = invitedByEmail;
+                if (invited.GroupId.HasValue) return BadRequest("Zaproszony student już należy do grupy.");
                 targetStudentId = invited.Id;
             }
             else if (string.Equals(reqType, "ProjectRequest", StringComparison.OrdinalIgnoreCase))
             {
                 if (creatorStudent == null || !group.LeaderId.HasValue || creatorStudent.Id != group.LeaderId.Value)
-                    return Forbid("Only the group leader can request a project.");
+                    return Forbid();
 
                 // dto.ProjectId was validated by sanitizer
                 var project = await _db.Projects.FindAsync(dto.ProjectId.Value);
-                if (project == null) return NotFound($"Project with id {dto.ProjectId.Value} not found.");
+                if (project == null) return NotFound($"Projekt o id {dto.ProjectId.Value} nie został znaleziony.");
 
                 if (project.MaxGroups.HasValue)
                 {
                     var acceptedCount = await _db.Groups.CountAsync(g => g.ProjectId == project.Id && g.IsAccepted == GroupStatus.Accepted);
-                    if (acceptedCount >= project.MaxGroups.Value) return BadRequest($"Project already reached max groups ({project.MaxGroups.Value}).");
+                    if (acceptedCount >= project.MaxGroups.Value) return BadRequest($"Projekt osiągnął maksymalną liczbę grup ({project.MaxGroups.Value}).");
                 }
 
-                if (group.ProjectId.HasValue) return BadRequest("Group is already assigned to a project.");
+                if (group.ProjectId.HasValue) return BadRequest("Grupa jest już przypisana do projektu.");
 
                 targetStudentId = null;
             }
             else if (string.Equals(reqType, "Application", StringComparison.OrdinalIgnoreCase))
             {
-                if (creatorStudent == null) return Forbid("Only students can apply to groups.");
-                if (creatorStudent.GroupId.HasValue) return BadRequest("You already belong to a group.");
+                if (creatorStudent == null) return Forbid();
+                if (creatorStudent.GroupId.HasValue) return BadRequest("Już należysz do grupy.");
 
-                // For Application the DTO TargetStudentId must point to the group's leader (sanitizer set this).
-                if (!dto.TargetStudentId.HasValue) return BadRequest("Wybrana grupa nie ma lidera; nie można złożyć Application.");
-                targetStudentId = dto.TargetStudentId.Value;
+                // For Application the target student is the group's leader.
+                if (!group.LeaderId.HasValue) return BadRequest("Wybrana grupa nie ma lidera; nie można złożyć Application.");
+                targetStudentId = group.LeaderId.Value;
             }
             else
             {
-                return BadRequest("Unsupported request type. Use 'Invitation', 'ProjectRequest' or 'Application'.");
+                return BadRequest("Nieobsługiwany typ prośby. Użyj 'Invitation', 'ProjectRequest' lub 'Application'.");
             }
 
             // load student entity if present
             Student? targetStudent = null;
             if (targetStudentId.HasValue) targetStudent = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == targetStudentId.Value);
+
+            // State-based validation: prevent duplicate or concurrent requests of same type for same relation
+            var reqTypeNorm = reqType.ToLowerInvariant();
+            if (reqTypeNorm == "projectrequest")
+            {
+                // same GroupId + ProjectId + Type
+                var existing = await _db.GroupRequests
+                    .Where(gr => gr.GroupId == dto.GroupId && gr.ProjectId == dto.ProjectId && gr.Type != null && gr.Type.ToLower() == reqTypeNorm)
+                    .ToListAsync();
+
+                if (existing.Any(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted))
+                {
+                    return BadRequest("Nie można wysłać prośby o ten projekt — istnieje już aktywna (oczekująca lub zaakceptowana) prośba dla tej grupy.");
+                }
+                // if all existing are Declined (or none exist) we allow creating a new one
+                // For ProjectRequest we perform a cleanup + create in a single transactional operation
+                if (!dto.ProjectId.HasValue) return BadRequest("Dla typu ProjectRequest pole ProjectId jest wymagane");
+                var created = await _groupRequestService.CreateProjectRequestWithCleanup(dto.GroupId, dto.ProjectId.Value, currentUserId);
+                return CreatedAtAction(nameof(Post), new { id = created.Id }, created);
+            }
+            else if (reqTypeNorm == "invitation" || reqTypeNorm == "invite")
+            {
+                if (!targetStudentId.HasValue)
+                    return BadRequest("Target student not resolved for Invitation.");
+
+                var existing = await _db.GroupRequests
+                    .Where(gr => gr.GroupId == dto.GroupId && gr.StudentId == targetStudentId && gr.Type != null && gr.Type.ToLower() == reqTypeNorm)
+                    .ToListAsync();
+
+                if (existing.Any(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted))
+                {
+                    return BadRequest("Nie możesz wysłać zaproszenia — istnieje już aktywne (oczekujące lub zaakceptowane) zaproszenie dla tego studenta i tej grupy.");
+                }
+            }
+            else if (reqTypeNorm == "application")
+            {
+                if (!targetStudentId.HasValue)
+                    return BadRequest("Unable to resolve target student for Application.");
+
+                var existing = await _db.GroupRequests
+                    .Where(gr => gr.GroupId == dto.GroupId && gr.StudentId == targetStudentId && gr.Type != null && gr.Type.ToLower() == reqTypeNorm)
+                    .ToListAsync();
+
+                if (existing.Any(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted))
+                {
+                    return BadRequest("Nie możesz złożyć wniosku — istnieje już aktywna prośba o dołączenie dla tej relacji.");
+                }
+            }
 
             var entity = new GroupRequest
             {
@@ -124,10 +182,32 @@ namespace wspolpracujmy.Controllers
             await using var tx = await _db.Database.BeginTransactionAsync();
             try
             {
+                // Re-check inside transaction to avoid races: ensure no Pending/Accepted exists anymore
+                var reqTypeNormTx = reqType.ToLowerInvariant();
+                if (reqTypeNormTx == "projectrequest")
+                {
+                    var existsTx = await _db.GroupRequests
+                        .Where(gr => gr.GroupId == dto.GroupId && gr.ProjectId == dto.ProjectId && gr.Type != null && gr.Type.ToLower() == reqTypeNormTx)
+                        .AnyAsync(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted);
+                    if (existsTx) return BadRequest("Nie można wysłać prośby o ten projekt — istnieje już aktywna (oczekująca lub zaakceptowana) prośba dla tej grupy.");
+                }
+                else if (reqTypeNormTx == "invitation" || reqTypeNormTx == "invite")
+                {
+                    if (targetStudentId.HasValue)
+                    {
+                        var existsTx = await _db.GroupRequests
+                            .Where(gr => gr.GroupId == dto.GroupId && gr.StudentId == targetStudentId && gr.Type != null && gr.Type.ToLower() == reqTypeNormTx)
+                            .AnyAsync(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted);
+                        if (existsTx) return BadRequest("Nie możesz wysłać zaproszenia — istnieje już aktywne (oczekujące lub zaakceptowane) zaproszenie dla tego studenta i tej grupy.");
+                    }
+                }
                 _db.GroupRequests.Add(entity);
 
                 var createdAt = DateTime.UtcNow;
                 const string linkTarget = "/requests";
+
+                // Collect notifications to create after the GroupRequest entity is saved
+                var notificationsToCreate = new System.Collections.Generic.List<(int userId, string content, string? link)>();
 
                 if (string.Equals(reqType, "Application", StringComparison.OrdinalIgnoreCase))
                 {
@@ -142,7 +222,7 @@ namespace wspolpracujmy.Controllers
                             var leaderUser = await _db.Users.FindAsync(leader.UserId);
                             if (leaderUser != null)
                             {
-                                _db.Notifications.Add(new Notification { UserId = leader.UserId, Content = content, Status = NotificationStatus.NotRead, User = leaderUser, CreatedAt = createdAt, LinkTarget = linkTarget });
+                                notificationsToCreate.Add((leader.UserId, content, linkTarget));
                             }
                         }
                     }
@@ -156,7 +236,7 @@ namespace wspolpracujmy.Controllers
                         var invitedUser = await _db.Users.FindAsync(targetStudent.UserId);
                         if (invitedUser != null)
                         {
-                            _db.Notifications.Add(new Notification { UserId = invitedUser.Id, Content = content, Status = NotificationStatus.NotRead, User = invitedUser, CreatedAt = createdAt, LinkTarget = linkTarget });
+                            notificationsToCreate.Add((invitedUser.Id, content, linkTarget));
                         }
                     }
                 }
@@ -171,7 +251,7 @@ namespace wspolpracujmy.Controllers
                             if (companyUser != null)
                             {
                                 var content = $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {project.Topic}";
-                                _db.Notifications.Add(new Notification { UserId = companyUser.Id, Content = content, Status = NotificationStatus.NotRead, User = companyUser, CreatedAt = createdAt, LinkTarget = linkTarget });
+                                notificationsToCreate.Add((companyUser.Id, content, linkTarget));
                                 // assign requested project to group and mark as pending approval
                                 group.ProjectId = dto.ProjectId.Value;
                                 group.IsAccepted = GroupStatus.Pending;
@@ -183,16 +263,31 @@ namespace wspolpracujmy.Controllers
 
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
+
+                // Now that entity.Id exists and transaction is complete, create notifications with FK
+                try
+                {
+                    foreach (var n in notificationsToCreate)
+                    {
+                        await _notifications.CreateNotificationAsync(n.userId, n.content, n.link, entity.Id);
+                    }
+                }
+                catch
+                {
+                    // ignore notification creation errors — not critical for request creation
+                }
+
                 return CreatedAtAction(nameof(Post), new { id = entity.Id }, entity);
             }
             catch (Exception ex)
             {
                 await tx.RollbackAsync();
-                return Problem("Failed to create request and notification: " + ex.Message);
+                return Problem("Nie udało się utworzyć prośby i powiadomień: " + ex.Message);
             }
         }
 
         [HttpPost("{id:int}/respond")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<IActionResult> Respond(int id, [FromBody] RespondGroupRequestDto dto)
         {
             if (dto == null) return BadRequest();
@@ -201,7 +296,7 @@ namespace wspolpracujmy.Controllers
             if (req == null) return NotFound();
 
             if (req.Status == GroupStatus.Accepted || req.Status == GroupStatus.Declined)
-                return BadRequest("Request already responded");
+                return BadRequest("Prośba została już rozpatrzona.");
 
             var group = await _db.Groups.Include(g => g.Project).Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == req.GroupId);
 
@@ -209,23 +304,102 @@ namespace wspolpracujmy.Controllers
             var creatorStudent = creatorUser != null ? await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.UserId == creatorUser.Id) : null;
             Student? targetStudent = null;
             if (req.StudentId.HasValue) targetStudent = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == req.StudentId.Value);
+            // determine current user and role
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
 
             var action = dto.Action?.Trim().ToLowerInvariant();
-            if (action != "accept" && action != "decline") return BadRequest("Action must be 'accept' or 'decline'");
+            if (action != "accept" && action != "decline") return BadRequest("Akcja musi być 'accept' lub 'decline'.");
+
+            // Authorization: who can respond depends on request type
+            var reqType = req.Type?.Trim().ToLowerInvariant();
+            var isAdmin = currentUser.Role == Models.Role.Admin;
+
+            if (reqType == "projectrequest")
+            {
+                // only company owner (of the project) or admin can respond
+                if (!req.ProjectId.HasValue) return BadRequest("Brak powiązanego projektu dla tej prośby.");
+                var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == req.ProjectId.Value);
+                if (project == null) return NotFound("Powiązany projekt nie został znaleziony.");
+                if (!isAdmin)
+                {
+                    if (project.Company == null) return Forbid();
+                    if (project.Company.UserId != currentUserId) return Forbid();
+                }
+            }
+            else if (reqType == "invitation" || reqType == "invite" || reqType == "application")
+            {
+                // only group leader (for the group) or admin OR company (for applications where company responds) can respond
+                var isLeader = false;
+                if (group != null && group.LeaderId.HasValue)
+                {
+                    var leader = await _db.Students.FirstOrDefaultAsync(s => s.Id == group.LeaderId.Value);
+                    if (leader != null && leader.UserId == currentUserId) isLeader = true;
+                }
+                if (!isAdmin && !isLeader)
+                {
+                    // allow company to respond to applications where they are the project owner
+                    if (reqType == "application" && req.ProjectId.HasValue)
+                    {
+                        var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == req.ProjectId.Value);
+                        if (project == null) return NotFound("Powiązany projekt nie został znaleziony.");
+                        if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
+                    }
+                    else
+                    {
+                        return Forbid();
+                    }
+                }
+            }
 
             req.Status = action == "accept" ? GroupStatus.Accepted : GroupStatus.Declined;
             req.RespondedAt = DateTime.UtcNow;
 
-            if (action == "accept" && req.Type != null && req.Type.Equals("invite", StringComparison.OrdinalIgnoreCase))
+            if (action == "accept" && req.Type != null && (req.Type.Equals("invite", StringComparison.OrdinalIgnoreCase) || req.Type.Equals("invitation", StringComparison.OrdinalIgnoreCase)))
             {
                 if (targetStudent != null)
                 {
                     var project = group?.Project ?? (group?.ProjectId.HasValue == true ? await _db.Projects.FindAsync(group.ProjectId.Value) : null);
                     var currentMembers = group?.Members?.Count ?? (await _db.Students.CountAsync(s => s.GroupId == req.GroupId));
-                    if (project != null && currentMembers >= project.MaxNumberGroupMembers) return BadRequest($"Group already has {currentMembers} members which meets/exceeds project's max of {project.MaxNumberGroupMembers}.");
+                    if (project != null && currentMembers >= project.MaxNumberGroupMembers) return BadRequest($"Grupa ma już {currentMembers} członków, co przekracza maksymalny limit projektu ({project.MaxNumberGroupMembers}).");
 
-                    targetStudent.GroupId = req.GroupId;
-                    _db.Students.Update(targetStudent);
+                    // Persist membership change directly via SQL to avoid tracking/merge issues in this flow
+                    var affected = await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Students\" SET group_id = {req.GroupId} WHERE id = {targetStudent.Id}");
+                    if (affected == 0)
+                    {
+                        // fallback: update via EF if raw SQL didn't affect any row
+                        targetStudent.GroupId = req.GroupId;
+                        _db.Students.Update(targetStudent);
+                        await _db.SaveChangesAsync();
+                    }
+                    // reload tracked entity so further queries in this context see updated value
+                    try
+                    {
+                        await _db.Entry(targetStudent).ReloadAsync();
+                    }
+                    catch
+                    {
+                        // ignore reload failures
+                    }
+                    // notify all current/future members that a student joined the group
+                    try
+                    {
+                        var members = await _db.Students.Where(s => s.GroupId == req.GroupId).ToListAsync();
+                        var joinerName = targetStudent.User != null ? $"{targetStudent.User.Name} {targetStudent.User.Surname}" : targetStudent.Email;
+                        var contentJoin = $"Student {joinerName} dołączył do zespołu {group?.Name}.";
+                        foreach (var m in members)
+                        {
+                            await _notifications.CreateNotificationAsync(m.UserId, contentJoin, $"group:{group?.Id}");
+                        }
+                    }
+                    catch
+                    {
+                        // ignore notification errors
+                    }
                 }
             }
 
@@ -239,7 +413,7 @@ namespace wspolpracujmy.Controllers
                 {
                     var project = group?.Project ?? (req.ProjectId.HasValue ? await _db.Projects.FindAsync(req.ProjectId.Value) : null);
                     var company = project != null ? await _db.Companies.FindAsync(project.CompanyId) : null;
-                    var responderIsCompany = company != null && dto.RespondedByUserId == company.UserId;
+                    var responderIsCompany = company != null && currentUserId == company.UserId;
 
                     if (responderIsCompany)
                     {
@@ -247,7 +421,7 @@ namespace wspolpracujmy.Controllers
                         {
                             var proj = group.Project ?? (group.ProjectId.HasValue ? await _db.Projects.FindAsync(group.ProjectId.Value) : null);
                             var memberCount = group.Members?.Count ?? await _db.Students.CountAsync(s => s.GroupId == group.Id);
-                            if (action == "accept" && proj != null && memberCount > proj.MaxNumberGroupMembers) return BadRequest($"Cannot accept group: it has {memberCount} members which exceeds project's max of {proj.MaxNumberGroupMembers}.");
+                            if (action == "accept" && proj != null && memberCount > proj.MaxNumberGroupMembers) return BadRequest($"Nie można zaakceptować grupy: ma {memberCount} członków, co przekracza maksymalny limit projektu ({proj.MaxNumberGroupMembers}).");
 
                             if (action == "accept" && req.ProjectId.HasValue && group.ProjectId != req.ProjectId.Value) group.ProjectId = req.ProjectId.Value;
 
@@ -338,16 +512,17 @@ namespace wspolpracujmy.Controllers
         }
 
         // Validates and sanitizes CreateGroupRequestDto according to strict rules based on `Type`.
-        // - Invitation: TargetStudentId required, ProjectId forced to null.
-        // - ProjectRequest: ProjectId required, TargetStudentId forced to null.
-        // - Application: ProjectId forced to null, TargetStudentId set to group's leader id (must exist).
+        // - Invitation: TargetEmail required, ProjectId forced to null.
+        // - ProjectRequest: ProjectId required.
+        // - Application: ProjectId forced to null; target student resolved to group's leader.
         private (bool IsValid, string? ErrorMessage) ValidateAndSanitizeDto(CreateGroupRequestDto dto, string reqType, Group group)
         {
             if (string.Equals(reqType, "Invitation", StringComparison.OrdinalIgnoreCase))
             {
-                if (!dto.TargetStudentId.HasValue)
-                    return (false, "Dla typu Invitation pole TargetStudentId jest wymagane");
+                // Allow TargetEmail for invitations; ProjectId must be null.
                 dto.ProjectId = null;
+                if (string.IsNullOrWhiteSpace(dto.TargetEmail))
+                    return (false, "Dla typu Invitation pole TargetEmail jest wymagane");
                 return (true, null);
             }
 
@@ -355,7 +530,6 @@ namespace wspolpracujmy.Controllers
             {
                 if (!dto.ProjectId.HasValue)
                     return (false, "Dla typu ProjectRequest pole ProjectId jest wymagane");
-                dto.TargetStudentId = null;
                 return (true, null);
             }
 
@@ -364,11 +538,10 @@ namespace wspolpracujmy.Controllers
                 dto.ProjectId = null;
                 if (!group.LeaderId.HasValue)
                     return (false, "Wybrana grupa nie ma lidera; nie można złożyć Application.");
-                dto.TargetStudentId = group.LeaderId.Value;
                 return (true, null);
             }
 
-            return (false, "Unsupported request type. Use 'Invitation', 'ProjectRequest' or 'Application'.");
+            return (false, "Nieobsługiwany typ prośby. Użyj 'Invitation', 'ProjectRequest' lub 'Application'.");
         }
     }
 }

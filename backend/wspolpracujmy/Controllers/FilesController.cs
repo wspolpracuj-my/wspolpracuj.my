@@ -12,7 +12,7 @@ namespace wspolpracujmy.Controllers
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do zarządzania metadanymi plików w aplikacji.
+    /// Kontroler do zarządzania metadanymi plików (projekty, grupy).
     /// </summary>
     public class FilesController : ControllerBase
     {
@@ -50,6 +50,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nowe metadane pliku w bazie.
         /// </summary>
@@ -57,12 +58,26 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzony obiekt pliku z kodem 201 Created.</returns>
         public async Task<ActionResult<FileEntity>> Post(FileEntity file)
         {
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+
+            if (role != "Admin")
+            {
+                file.UserId = currentUserId;
+            }
+
             _db.Files.Add(file);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = file.Id }, file);
         }
 
         [HttpPut("{id:guid}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Aktualizuje metadane pliku (zamienia cały obiekt).
         /// </summary>
@@ -72,12 +87,30 @@ namespace wspolpracujmy.Controllers
         public async Task<IActionResult> Put(Guid id, FileEntity file)
         {
             if (id != file.Id) return BadRequest();
+
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+
+            if (role != "Admin")
+            {
+                var existing = await _db.Files.FindAsync(id);
+                if (existing == null) return NotFound();
+                if (existing.UserId != currentUserId) return Forbid();
+                file.UserId = existing.UserId;
+            }
+
             _db.Entry(file).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpDelete("{id:guid}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Usuwa metadane pliku po identyfikatorze.
         /// </summary>
@@ -87,6 +120,16 @@ namespace wspolpracujmy.Controllers
         {
             var f = await _db.Files.FindAsync(id);
             if (f == null) return NotFound();
+
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+            if (role != "Admin" && f.UserId != currentUserId) return Forbid();
+
             _db.Files.Remove(f);
             await _db.SaveChangesAsync();
             return NoContent();

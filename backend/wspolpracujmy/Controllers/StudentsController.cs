@@ -11,7 +11,7 @@ namespace wspolpracujmy.Controllers
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do zarządzania encjami studenta.
+    /// Kontroler do zarządzania danymi studentów.
     /// </summary>
     public class StudentsController : ControllerBase
     {
@@ -21,6 +21,19 @@ namespace wspolpracujmy.Controllers
         /// </summary>
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         public StudentsController(AppDbContext db) => _db = db;
+
+        [HttpGet("byEmail")]
+        public async Task<ActionResult<StudentDto>> GetByEmail([FromQuery] string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return BadRequest("Parametr zapytania 'email' jest wymagany.");
+            var e = email.Trim().ToLowerInvariant();
+            var student = await _db.Students
+                .Where(s => s.Email.ToLower() == e)
+                .Select(s => new StudentDto { Id = s.Id, UserId = s.UserId, GroupId = s.GroupId, Email = s.Email })
+                .FirstOrDefaultAsync();
+            if (student == null) return NotFound();
+            return Ok(student);
+        }
 
         // [HttpGet]
         // Removed: returning all students without filters/pagination.
@@ -95,7 +108,7 @@ namespace wspolpracujmy.Controllers
             if (student == null) return NotFound();
 
             var group = await _db.Groups.FindAsync(dto.GroupId);
-            if (group == null) return BadRequest(new { error = "Group not found" });
+            if (group == null) return BadRequest(new { error = "Nie znaleziono grupy." });
 
             student.GroupId = dto.GroupId;
             await _db.SaveChangesAsync();
