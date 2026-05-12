@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -55,6 +56,37 @@ namespace wspolpracujmy.Controllers
                 Role = u.Role,
                 Login = u.Login
             };
+        }
+
+        [HttpGet("students")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        /// <summary>
+        /// Zwraca listę wszystkich studentów (name, surname, studentId, userId). Dostęp tylko dla admina.
+        /// </summary>
+        public async Task<ActionResult<IEnumerable<DTOs.StudentSummaryDto>>> GetStudents()
+        {
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            if (currentUser.Role != Models.Role.Admin) return Forbid();
+
+            var students = await _db.Students
+                .Include(s => s.User)
+                .ToListAsync();
+
+            var result = students.Select(s => new DTOs.StudentSummaryDto
+            {
+                StudentId = s.Id,
+                UserId = s.UserId,
+                Name = s.User?.Name ?? string.Empty,
+                Surname = s.User?.Surname ?? string.Empty
+            }).ToList();
+
+            return Ok(result);
         }
 
         [HttpPost]

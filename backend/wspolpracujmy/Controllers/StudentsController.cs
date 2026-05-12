@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using Npgsql;
 using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
@@ -23,6 +24,7 @@ namespace wspolpracujmy.Controllers
         public StudentsController(AppDbContext db) => _db = db;
 
         [HttpGet("byEmail")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<ActionResult<StudentDto>> GetByEmail([FromQuery] string? email)
         {
             if (string.IsNullOrWhiteSpace(email)) return BadRequest("Parametr zapytania 'email' jest wymagany.");
@@ -53,6 +55,7 @@ namespace wspolpracujmy.Controllers
         // }
 
         [HttpGet("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Pobiera studenta po identyfikatorze w postaci DTO.
         /// </summary>
@@ -94,6 +97,7 @@ namespace wspolpracujmy.Controllers
         public class ChangeStudentGroupDto { public int GroupId { get; set; } }
 
         [HttpPatch("{id:int}/group")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zmienia grupę, do której należy student.
         /// </summary>
@@ -116,6 +120,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Usuwa studenta o podanym identyfikatorze.
         /// </summary>
@@ -123,9 +128,52 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) lub NotFound.</returns>
         public async Task<IActionResult> Delete(int id)
         {
-            var s = await _db.Students.FindAsync(id);
+            var s = await _db.Students.AsNoTracking().Where(st => st.Id == id).FirstOrDefaultAsync();
             if (s == null) return NotFound();
-            _db.Students.Remove(s);
+
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.AsNoTracking().Where(u => u.Id == currentUserId).FirstOrDefaultAsync();
+            if (currentUser == null) return Unauthorized();
+
+            if (currentUser.Role != Role.Admin) return Forbid();
+
+            // If the student is a leader, for each group either assign the next member as leader
+            // or remove the group. To avoid EF circular dependency, persist intermediate
+            // changes with multiple SaveChangesAsync calls:
+            var groupsLed = await _db.Groups.Where(g => g.LeaderId == s.Id).ToListAsync();
+
+            foreach (var group in groupsLed)
+            {
+                var nextMember = await _db.Students
+                    .Where(st => st.GroupId == group.Id && st.Id != s.Id)
+                    .OrderBy(st => st.Id)
+                    .FirstOrDefaultAsync();
+
+                if (nextMember != null)
+                {
+                    group.LeaderId = nextMember.Id;
+                    _db.Groups.Update(group);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    // No other members -> unset leader, commit, then remove group
+                    group.LeaderId = null;
+                    _db.Groups.Update(group);
+                    await _db.SaveChangesAsync();
+
+                    _db.Groups.Remove(group);
+                    await _db.SaveChangesAsync();
+                }
+            }
+
+            // Finally remove the student
+            var toDelete = await _db.Students.FindAsync(s.Id);
+            if (toDelete == null) return NotFound();
+            _db.Students.Remove(toDelete);
             await _db.SaveChangesAsync();
             return NoContent();
         }

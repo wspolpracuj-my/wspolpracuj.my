@@ -38,14 +38,15 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę podsumowań wszystkich projektów.
         /// </summary>
         /// <returns>Lista podsumowań projektów.</returns>
         public async Task<ActionResult<IEnumerable<ProjectSummaryDto>>> Get()
         {
-            var summaries = await _projectService.GetAllProjectSummariesAsync();
-            return Ok(summaries);
+            // Any authenticated user (including Admin) may list projects.
+            return Ok(await _projectService.GetAllProjectSummariesAsync());
         }
 
         // trzebazmienickoniecznie
@@ -196,6 +197,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("summary")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca podsumowania projektów dla konkretnej firmy.
         /// </summary>
@@ -211,17 +213,19 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("summary/all")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca podsumowania wszystkich projektów (bez filtrowania).
         /// </summary>
         /// <returns>Lista podsumowań projektów.</returns>
         public async Task<ActionResult<List<ProjectSummaryDto>>> GetAllSummaries()
         {
-            var summaries = await _projectService.GetAllProjectSummariesAsync();
-            return Ok(summaries);
+            // Any authenticated user (including Admin) may list all project summaries.
+            return Ok(await _projectService.GetAllProjectSummariesAsync());
         }
 
         [HttpGet("{projectId:int}/groups")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę grup przypisanych do danego projektu.
         /// </summary>
@@ -284,6 +288,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("{id:int}/details")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca szczegółowe informacje o projekcie.
         /// </summary>

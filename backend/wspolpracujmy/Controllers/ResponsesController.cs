@@ -27,6 +27,7 @@ namespace wspolpracujmy.Controllers
         // public async Task<IEnumerable<Response>> Get() => await _db.Responses.ToListAsync();
 
         [HttpGet("comment/{commentId:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę odpowiedzi przypisanych do konkretnego komentarza.
         /// </summary>

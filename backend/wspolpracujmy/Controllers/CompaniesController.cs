@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +25,30 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         public CompaniesController(AppDbContext db) => _db = db;
 
+        [HttpGet("list")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        /// <summary>
+        /// Zwraca listę firm (tylko Id i CompanyName) dostępne tylko dla administratora.
+        /// </summary>
+        public async Task<ActionResult<IEnumerable<object>>> GetList()
+        {
+            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            if (currentUser.Role != Models.Role.Admin) return Forbid();
+
+            var list = await _db.Companies
+                .Select(c => new { c.Id, c.CompanyName })
+                .ToListAsync();
+            return Ok(list);
+        }
+
         [HttpGet]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę wszystkich firm z podstawowymi danymi.
         /// </summary>
@@ -39,6 +64,7 @@ namespace wspolpracujmy.Controllers
             .ToListAsync();
 
         [HttpGet("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Pobiera firmę po identyfikatorze z podstawowymi danymi.
         /// </summary>
@@ -58,6 +84,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("user/{userId}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<ActionResult<Company>> GetByUserId(int userId)
         {
             var company = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
@@ -74,7 +101,7 @@ namespace wspolpracujmy.Controllers
         /// <returns>DTO podsumowania utworzonej firmy z kodem 201 Created.</returns>
         public async Task<ActionResult<CompanySummaryDto>> Post([FromBody] CreateCompanyDto dto)
         {
-            // Only Admin or the user themself can create their company record
+            // Only Admin can create company records via this endpoint.
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
                          ?? User?.FindFirst("sub")?.Value;
@@ -83,7 +110,10 @@ namespace wspolpracujmy.Controllers
             if (currentUser == null) return Unauthorized();
 
             var isAdmin = currentUser.Role == Role.Admin;
-            if (!isAdmin && currentUserId != dto.UserId) return Forbid();
+            if (!isAdmin) return Forbid();
+
+            // Require password confirmation to match before creating record
+            if (dto.Password != dto.PasswordConfirm) return BadRequest("Password and confirmation do not match.");
 
             var user = await _db.Users.FindAsync(dto.UserId);
             if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
