@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// Skrócone informacje o grupie do wyświetlania w listach.
@@ -9,6 +9,8 @@ namespace wspolpracujmy.Models
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public int LeaderId { get; set; }
+        public int MemberCount { get; set; }
         public List<MemberSummaryDto> Members { get; set; } = new List<MemberSummaryDto>();
     }
 }

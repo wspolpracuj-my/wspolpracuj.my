@@ -47,6 +47,6 @@ namespace wspolpracujmy.Models
         public DateTime CreatedAt { get; set; }
 
         [JsonIgnore]
-        public required User User { get; set; }
+        public User? User { get; set; }
     }
 }

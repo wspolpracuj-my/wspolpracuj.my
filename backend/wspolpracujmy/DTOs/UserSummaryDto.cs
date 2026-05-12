@@ -1,4 +1,6 @@
-namespace wspolpracujmy.Models
+using wspolpracujmy.Models;
+
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// Skrócone informacje o użytkowniku do zwracania po utworzeniu.

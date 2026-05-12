@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Controllers
@@ -66,6 +67,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nową firmę.
         /// </summary>
@@ -73,15 +75,26 @@ namespace wspolpracujmy.Controllers
         /// <returns>DTO podsumowania utworzonej firmy z kodem 201 Created.</returns>
         public async Task<ActionResult<CompanySummaryDto>> Post([FromBody] CreateCompanyDto dto)
         {
+            // Only Admin or the user themself can create their company record
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            var isAdmin = currentUser.Role == Role.Admin;
+            if (!isAdmin && currentUserId != dto.UserId) return Forbid();
+
             var user = await _db.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound($"User with id {dto.UserId} not found.");
+            if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
 
             // ensure the user is a company account
-            if (user.Role != Role.Company) return BadRequest("User must have Role.Company to create a company.");
+            if (user.Role != Role.Company) return BadRequest("Użytkownik musi mieć rolę Company, aby utworzyć firmę.");
 
             // pre-check for existing company to avoid DB unique constraint exception
             var alreadyHas = await _db.Companies.AnyAsync(c => c.UserId == dto.UserId);
-            if (alreadyHas) return Conflict($"User with id {dto.UserId} already has a company.");
+            if (alreadyHas) return Conflict($"Użytkownik o id {dto.UserId} już posiada firmę.");
 
             var company = new Company
             {
@@ -104,6 +117,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Aktualizuje istniejącą firmę.
         /// </summary>
@@ -114,13 +128,23 @@ namespace wspolpracujmy.Controllers
         {
             var company = await _db.Companies.FindAsync(id);
             if (company == null) return NotFound();
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            var isAdmin = currentUser.Role == Role.Admin;
+            // only admin or company owner can update
+            if (!isAdmin && company.UserId != currentUserId) return Forbid();
 
             int currentUserId = GetCurrentUserId();
             if (!await CanManageCompanyAsync(id, currentUserId) && !IsAdmin())
                 return Forbid("No permission to update this company");
 
             var user = await _db.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound($"User with id {dto.UserId} not found.");
+            if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
 
             company.UserId = dto.UserId;
             company.CompanyName = dto.CompanyName;
@@ -133,6 +157,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Usuwa firmę o podanym identyfikatorze.
         /// </summary>
@@ -143,9 +168,21 @@ namespace wspolpracujmy.Controllers
             var c = await _db.Companies.FindAsync(id);
             if (c == null) return NotFound();
 
+<<<<<<< HEAD
             int currentUserId = GetCurrentUserId();
             if (!await CanManageCompanyAsync(id, currentUserId) && !IsAdmin())
                 return Forbid("No permission to delete this company");
+=======
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            var isAdmin = currentUser.Role == Role.Admin;
+            if (!isAdmin && c.UserId != currentUserId) return Forbid();
+>>>>>>> origin/StudentsApi+AuthByRole
 
             _db.Companies.Remove(c);
             await _db.SaveChangesAsync();

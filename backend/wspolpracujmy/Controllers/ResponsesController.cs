@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 using Microsoft.AspNetCore.Authorization;
 
@@ -36,7 +37,7 @@ namespace wspolpracujmy.Controllers
         /// <returns>Lista DTO odpowiedzi.</returns>
         public async Task<ActionResult<List<ResponseDto>>> GetByComment(int commentId)
         {
-            if (commentId <= 0) return BadRequest("commentId must be greater than 0");
+            if (commentId <= 0) return BadRequest("Parametr commentId musi być większy niż 0.");
 
             var comment = await _db.Comments.Include(c => c.Project).FirstOrDefaultAsync(c => c.Id == commentId);
             if (comment == null) return NotFound();
@@ -61,6 +62,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nową odpowiedź na podstawie DTO.
         /// </summary>
@@ -70,23 +72,37 @@ namespace wspolpracujmy.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
+<<<<<<< HEAD
             int currentUserId = GetCurrentUserId();
             if (dto.UserId != currentUserId) return Forbid("Cannot respond as another user");
 
             var comment = await _db.Comments.Include(c => c.Project).FirstOrDefaultAsync(c => c.Id == dto.CommentId);
             if (comment == null) return NotFound($"Comment with id {dto.CommentId} not found.");
+=======
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            // prevent spoofing: set response author to current user
+            dto.UserId = currentUserId;
+
+            var comment = await _db.Comments.FindAsync(dto.CommentId);
+            if (comment == null) return NotFound($"Komentarz o id {dto.CommentId} nie został znaleziony.");
+>>>>>>> origin/StudentsApi+AuthByRole
 
             if (!await CanAccessProjectAsync(comment.ProjectId, currentUserId)) return Forbid("No access to this project");
 
             var user = await _db.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound($"User with id {dto.UserId} not found.");
+            if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
 
             var response = new Response
             {
                 CommentId = dto.CommentId,
                 UserId = dto.UserId,
                 Content = dto.Content,
-                CreatedAt = System.DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
                 Comment = comment,
                 User = user
             };

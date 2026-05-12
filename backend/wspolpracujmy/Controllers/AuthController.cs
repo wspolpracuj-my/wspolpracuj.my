@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 using wspolpracujmy.Data;
 using wspolpracujmy.DTOs.Auth;
 using wspolpracujmy.Models;
@@ -9,7 +10,9 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
+    /// <summary>
+    /// Kontroler uwierzytelniania i autoryzacji użytkowników.
+    /// </summary>
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -28,11 +31,36 @@ namespace wspolpracujmy.Controllers
             // Sprawdź czy login już istnieje
             if (await _context.Users.AnyAsync(u => u.Login == request.Login))
             {
-                return BadRequest(new { message = "Login already exists" });
+                return BadRequest(new { message = "Login już istnieje" });
+            }
+
+            if (request.Role == Role.Student && await _context.Students.AnyAsync(s => s.Email == request.Email))
+            {
+                return BadRequest(new { message = "E-mail studenta już istnieje w systemie" });
+            }
+
+            // If registering as a Student, enforce university email pattern: 6 digits@ g.elearn... or 6 digits@ stud....
+            if (request.Role == Role.Student)
+            {
+                if (string.IsNullOrWhiteSpace(request.Email))
+                {
+                    return BadRequest(new { message = "E-mail studenta jest wymagany." });
+                }
+
+                var email = request.Email.Trim().ToLowerInvariant();
+                var pattern = "^\\d{6}@(g\\.elearn\\.uz\\.zgora\\.pl|stud\\.uz\\.zgora\\.pl)$";
+                if (!Regex.IsMatch(email, pattern))
+                {
+                    return BadRequest(new { message = "E-mail studenta musi składać się z 6 cyfr i kończyć się @g.elearn.uz.zgora.pl lub @stud.uz.zgora.pl" });
+                }
+
+                request.Email = email;
             }
 
             // Hashowanie hasła
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
             var user = new User
             {
@@ -45,6 +73,22 @@ namespace wspolpracujmy.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+
+            if (user.Role == Role.Student)
+            {
+                var student = new Student
+                {
+                    UserId = user.Id,
+                    GroupId = null,
+                    Email = request.Email!,
+                    User = user
+                };
+
+                _context.Students.Add(student);
+                await _context.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
 
             // Generuj token
             var token = _jwtTokenService.GenerateToken(user);
@@ -69,7 +113,7 @@ namespace wspolpracujmy.Controllers
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                return Unauthorized(new { message = "Invalid login or password" });
+                return Unauthorized(new { message = "Nieprawidłowy login lub hasło" });
             }
 
             var token = _jwtTokenService.GenerateToken(user);

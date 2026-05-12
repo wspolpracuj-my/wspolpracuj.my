@@ -11,7 +11,7 @@ namespace wspolpracujmy.Controllers
     [Route("api/[controller]")]
     [Authorize]
     /// <summary>
-    /// Kontroler do pobierania typów spotkań dostępnych w aplikacji.
+    /// Kontroler typów spotkań (formaty spotkań/projektów).
     /// </summary>
     public class MeetingTypesController : ControllerBase
     {

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO używane przy tworzeniu i aktualizacji firmy.

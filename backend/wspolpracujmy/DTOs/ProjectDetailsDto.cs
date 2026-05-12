@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using wspolpracujmy.Models;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO zawierające szczegółowe informacje o projekcie.
@@ -8,7 +9,8 @@ namespace wspolpracujmy.Models
     public class ProjectDetailsDto
     {
         public int Id { get; set; }
-        public string Topic { get; set; } = string.Empty;
+        public required string Topic { get; set; }
+        public required string CompanyName { get; set; }
         public string? ProjectGoal { get; set; }
         public string? WorkScope { get; set; }
         public string? NeededTechnologies { get; set; }

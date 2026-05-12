@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 using Microsoft.AspNetCore.Authorization;
 
@@ -28,6 +29,7 @@ namespace wspolpracujmy.Controllers
         // public async Task<IEnumerable<User>> Get() => await _db.Users.ToListAsync();
 
         [HttpGet("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Pobiera użytkownika po identyfikatorze.
         /// </summary>
@@ -35,6 +37,16 @@ namespace wspolpracujmy.Controllers
         /// <returns>DTO podsumowania użytkownika lub NotFound jeśli nie istnieje.</returns>
         public async Task<ActionResult<UserSummaryDto>> Get(int id)
         {
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            // Only admin or the user themself can view full user details
+            if (currentUser.Role != Models.Role.Admin && currentUserId != id) return Forbid();
+
             var u = await _db.Users.FindAsync(id);
             if (u == null) return NotFound();
             return new UserSummaryDto
@@ -48,6 +60,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nowego użytkownika w systemie.
         /// </summary>
@@ -55,6 +68,15 @@ namespace wspolpracujmy.Controllers
         /// <returns>DTO utworzonego użytkownika z kodem 201 Created.</returns>
         public async Task<ActionResult<UserSummaryDto>> Post([FromBody] CreateUserDto dto)
         {
+            // Only admin can create users through this endpoint
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+            if (currentUser.Role != Models.Role.Admin) return Forbid();
+
             var user = new User
             {
                 Name = dto.Name,
@@ -80,6 +102,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Usuwa użytkownika o podanym identyfikatorze.
         /// </summary>
@@ -87,6 +110,16 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) gdy usunięto, lub NotFound.</returns>
         public async Task<IActionResult> Delete(int id)
         {
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            // only admin can delete users
+            if (currentUser.Role != Models.Role.Admin) return Forbid();
+
             var u = await _db.Users.FindAsync(id);
             if (u == null) return NotFound();
 

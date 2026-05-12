@@ -3,7 +3,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Controllers
@@ -46,14 +48,19 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<NotificationDto>>> GetForUser()
+        public async Task<ActionResult<IEnumerable<NotificationDto>>> GetForUser([FromQuery] int? userId = null)
         {
-            int currentUserId = GetCurrentUserId();
-            var list = await _notifications.GetNotificationsForUserAsync(currentUserId);
+            var currentUserId = GetCurrentUserId();
+            var targetUserId = userId ?? currentUserId;
+            if (userId.HasValue && targetUserId != currentUserId && !IsAdmin())
+                return Forbid("Brak uprawnień do przeglądania powiadomień innego użytkownika.");
+
+            var list = await _notifications.GetNotificationsForUserAsync(targetUserId);
             return Ok(list);
         }
 
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Tworzy nowe powiadomienie.
         /// </summary>
@@ -61,24 +68,50 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzone powiadomienie z kodem 201 Created.</returns>
         public async Task<ActionResult<Notification>> Post(Notification notification)
         {
-            _db.Notifications.Add(notification);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(Get), new { id = notification.Id }, notification);
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized();
+
+            var role = User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User?.FindFirst("role")?.Value;
+            // Non-admins should not create notifications for other users (prevent impersonation)
+            if (role != "Admin")
+            {
+                notification.UserId = currentUserId;
+            }
+
+            // Use NotificationService to create the notification (handles dedupe and FK)
+            var created = await _notifications.CreateNotificationAsync(notification.UserId, notification.Content, notification.LinkTarget, notification.GroupRequestId);
+            return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
         }
 
         [HttpPost("mark-read")]
         public async Task<IActionResult> MarkRead([FromBody] int[] ids)
         {
-            if (ids == null || ids.Length == 0) return BadRequest("ids required");
-            await _notifications.MarkAsReadAsync(ids);
+            if (ids == null || ids.Length == 0) return BadRequest("Tablica 'ids' jest wymagana.");
+
+            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                return Unauthorized("Nieautoryzowany użytkownik.");
+
+            await _notifications.MarkAsReadForUserAsync(currentUserId, ids);
             return NoContent();
         }
 
         private int GetCurrentUserId()
         {
-            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var claim = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
             if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
             return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User?.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
         }
     }
 }

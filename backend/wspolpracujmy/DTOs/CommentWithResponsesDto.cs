@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// DTO zawierające komentarz wraz z powiązanymi odpowiedziami.

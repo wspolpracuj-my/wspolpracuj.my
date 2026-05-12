@@ -1,6 +1,6 @@
 using System;
 
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     /// <summary>
     /// Skrócone informacje o członku grupy do podglądu.

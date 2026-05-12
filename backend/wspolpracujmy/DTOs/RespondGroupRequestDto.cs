@@ -1,6 +1,4 @@
-using System;
-
-namespace wspolpracujmy.Models
+namespace wspolpracujmy.DTOs
 {
     public class RespondGroupRequestDto
     {

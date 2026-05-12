@@ -18,7 +18,7 @@ namespace wspolpracujmy.Services
         public string GenerateToken(User user)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
-            var secretKey = jwtSettings["SecretKey"] ?? throw new ArgumentNullException("SecretKey not configured");
+            var secretKey = jwtSettings["SecretKey"] ?? throw new ArgumentNullException("Brak konfiguracji JwtSettings: 'SecretKey'.");
             var issuer = jwtSettings["Issuer"] ?? "wspolpracujmy";
             var audience = jwtSettings["Audience"] ?? "wspolpracujmy";
             var expiryMinutes = int.Parse(jwtSettings["ExpiryMinutes"] ?? "60");

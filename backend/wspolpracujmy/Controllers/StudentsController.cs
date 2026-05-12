@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
+using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 using Microsoft.AspNetCore.Authorization;
 namespace wspolpracujmy.Controllers
@@ -11,7 +12,7 @@ namespace wspolpracujmy.Controllers
     [Route("api/[controller]")]
     [Authorize]
     /// <summary>
-    /// Kontroler do zarządzania encjami studenta.
+    /// Kontroler do zarządzania danymi studentów.
     /// </summary>
     public class StudentsController : ControllerBase
     {
@@ -22,38 +23,58 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         public StudentsController(AppDbContext db) => _db = db;
 
-        [HttpGet]
-        /// <summary>
-        /// Pobiera listę studentów.
-        /// </summary>
-        /// <returns>Lista studentów.</returns>
-        public async Task<IEnumerable<Student>> Get() => await _db.Students.Include(s => s.User).ToListAsync();
+        [HttpGet("byEmail")]
+        public async Task<ActionResult<StudentDto>> GetByEmail([FromQuery] string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return BadRequest("Parametr zapytania 'email' jest wymagany.");
+            var e = email.Trim().ToLowerInvariant();
+            var student = await _db.Students
+                .Where(s => s.Email.ToLower() == e)
+                .Select(s => new StudentDto { Id = s.Id, UserId = s.UserId, GroupId = s.GroupId, Email = s.Email })
+                .FirstOrDefaultAsync();
+            if (student == null) return NotFound();
+            return Ok(student);
+        }
+
+        // [HttpGet]
+        // Removed: returning all students without filters/pagination.
+        // public async Task<IEnumerable<Student>> Get() => await _db.Students.ToListAsync();
 
         [HttpGet("{id:int}")]
         /// <summary>
-        /// Pobiera studenta po identyfikatorze.
+        /// Pobiera studenta po identyfikatorze w postaci DTO.
         /// </summary>
         /// <param name="id">Id studenta.</param>
-        /// <returns>Obiekt studenta lub NotFound jeśli nie istnieje.</returns>
-        public async Task<ActionResult<Student>> Get(int id)
+        /// <returns>StudentDto lub NotFound jeśli nie istnieje.</returns>
+        public async Task<ActionResult<StudentDto>> Get(int id)
         {
-            var s = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(x => x.Id == id);
-            if (s == null) return NotFound();
-            return s;
+            var student = await _db.Students
+                .Where(s => s.Id == id)
+                .Select(s => new StudentDto
+                {
+                    Id = s.Id,
+                    UserId = s.UserId,
+                    GroupId = s.GroupId,
+                    Email = s.Email
+                })
+                .FirstOrDefaultAsync();
+
+            if (student == null) return NotFound();
+            return Ok(student);
         }
 
-        [HttpPost]
-        /// <summary>
-        /// Tworzy nowego studenta w systemie.
-        /// </summary>
-        /// <param name="student">Obiekt studenta do utworzenia.</param>
-        /// <returns>Utworzony student z kodem 201 Created.</returns>
-        public async Task<ActionResult<Student>> Post(Student student)
-        {
-            _db.Students.Add(student);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(Get), new { id = student.Id }, student);
-        }
+        // [HttpPost]
+        // /// <summary>
+        // /// Tworzy nowego studenta w systemie.
+        // /// </summary>
+        // /// <param name="student">Obiekt studenta do utworzenia.</param>
+        // /// <returns>Utworzony student z kodem 201 Created.</returns>
+        // public async Task<ActionResult<Student>> Post(Student student)
+        // {
+        //     _db.Students.Add(student);
+        //     await _db.SaveChangesAsync();
+        //     return CreatedAtAction(nameof(Get), new { id = student.Id }, student);
+        // }
 
         /// <summary>
         /// DTO używane do zmiany przypisania studenta do grupy.
@@ -74,21 +95,8 @@ namespace wspolpracujmy.Controllers
             var student = await _db.Students.FindAsync(id);
             if (student == null) return NotFound();
 
-            int currentUserId = GetCurrentUserId();
-            if (student.UserId != currentUserId && !IsAdmin()) return Forbid("No permission to change this student's group");
-
-            // If GroupId is null, remove student from group
-            if (dto.GroupId == null)
-            {
-                student.GroupId = null;
-            }
-            else
-            {
-                var group = await _db.Groups.FindAsync(dto.GroupId);
-                if (group == null) return BadRequest(new { error = "Group not found" });
-
-                student.GroupId = dto.GroupId;
-            }
+            var group = await _db.Groups.FindAsync(dto.GroupId);
+            if (group == null) return BadRequest(new { error = "Nie znaleziono grupy." });
 
             await _db.SaveChangesAsync();
             return NoContent();
