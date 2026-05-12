@@ -198,6 +198,30 @@ namespace wspolpracujmy.Data
                 .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Group)
+                .WithMany(g => g.GroupRequests)
+                .HasForeignKey(gr => gr.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Student)
+                .WithMany(s => s.GroupRequests)
+                .HasForeignKey(gr => gr.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(gr => gr.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.RespondedByUser)
+                .WithMany()
+                .HasForeignKey(gr => gr.RespondedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<CalendarEvent>()
                 .HasOne(c => c.Group)
                 .WithMany(g => g.CalendarEvents)

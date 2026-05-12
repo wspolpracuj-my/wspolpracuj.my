@@ -35,7 +35,22 @@ namespace wspolpracujmy.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
+        [Column("responded_by_user_id")]
+        public int? RespondedByUserId { get; set; }
+
         [Column("responded_at")]
         public DateTime? RespondedAt { get; set; } = null;
+
+        [JsonIgnore]
+        public Group Group { get; set; }
+
+        [JsonIgnore]
+        public Student Student { get; set; }
+
+        [JsonIgnore]
+        public User? CreatedByUser { get; set; }
+
+        [JsonIgnore]
+        public User? RespondedByUser { get; set; }
     }
 }

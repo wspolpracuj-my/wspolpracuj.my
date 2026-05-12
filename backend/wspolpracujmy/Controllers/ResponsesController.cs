@@ -4,11 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.Models;
+using Microsoft.AspNetCore.Authorization;
+
 
 namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania odpowiedziami na komentarze.
     /// </summary>
@@ -35,8 +38,11 @@ namespace wspolpracujmy.Controllers
         {
             if (commentId <= 0) return BadRequest("commentId must be greater than 0");
 
-            var exists = await _db.Comments.AnyAsync(c => c.Id == commentId);
-            if (!exists) return NotFound();
+            var comment = await _db.Comments.Include(c => c.Project).FirstOrDefaultAsync(c => c.Id == commentId);
+            if (comment == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(comment.ProjectId, currentUserId)) return Forbid();
 
             var responses = await _db.Responses
                 .Where(r => r.CommentId == commentId)
@@ -64,8 +70,13 @@ namespace wspolpracujmy.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var comment = await _db.Comments.FindAsync(dto.CommentId);
+            int currentUserId = GetCurrentUserId();
+            if (dto.UserId != currentUserId) return Forbid("Cannot respond as another user");
+
+            var comment = await _db.Comments.Include(c => c.Project).FirstOrDefaultAsync(c => c.Id == dto.CommentId);
             if (comment == null) return NotFound($"Comment with id {dto.CommentId} not found.");
+
+            if (!await CanAccessProjectAsync(comment.ProjectId, currentUserId)) return Forbid("No access to this project");
 
             var user = await _db.Users.FindAsync(dto.UserId);
             if (user == null) return NotFound($"User with id {dto.UserId} not found.");
@@ -83,6 +94,33 @@ namespace wspolpracujmy.Controllers
             _db.Responses.Add(response);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetByComment), new { commentId = response.CommentId }, response);
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
+        {
+            // Check if user is the company owner
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return false;
+            if (project.Company.UserId == userId) return true;
+
+            // Check if user is a member of a group in the project
+            var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student?.Group?.ProjectId == projectId) return true;
+
+            return false;
         }
     }
 }

@@ -12,8 +12,8 @@ using wspolpracujmy.Data;
 namespace wspolpracujmy.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260422185016_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260505232644_MakeStudentGroupIdNullable")]
+    partial class MakeStudentGroupIdNullable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -145,6 +145,10 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("gcs_object_name");
 
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
                     b.Property<string>("OriginalName")
                         .IsRequired()
                         .HasColumnType("text")
@@ -179,7 +183,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("is_accepted");
 
-                    b.Property<int>("LeaderId")
+                    b.Property<int?>("LeaderId")
                         .HasColumnType("integer")
                         .HasColumnName("leader_id");
 
@@ -187,10 +191,6 @@ namespace wspolpracujmy.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<int>("NumberOfMembers")
-                        .HasColumnType("integer")
-                        .HasColumnName("number_of_members");
 
                     b.Property<int>("ProjectId")
                         .HasColumnType("integer")
@@ -222,6 +222,49 @@ namespace wspolpracujmy.Migrations
                     b.ToTable("GroupFiles", (string)null);
                 });
 
+            modelBuilder.Entity("wspolpracujmy.Models.GroupRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<int>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("student_id");
+
+                    b.Property<string>("Type")
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("GroupRequests", (string)null);
+                });
+
             modelBuilder.Entity("wspolpracujmy.Models.MeetingType", b =>
                 {
                     b.Property<int>("Id")
@@ -233,6 +276,7 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("type");
 
@@ -254,6 +298,14 @@ namespace wspolpracujmy.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LinkTarget")
+                        .HasColumnType("text")
+                        .HasColumnName("link_target");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -350,6 +402,7 @@ namespace wspolpracujmy.Migrations
             modelBuilder.Entity("wspolpracujmy.Models.ProjectTag", b =>
                 {
                     b.Property<int>("ProjectId")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasColumnName("project_id");
 
@@ -413,7 +466,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("email");
 
-                    b.Property<int>("GroupId")
+                    b.Property<int?>("GroupId")
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
@@ -461,18 +514,20 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Login")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("login");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<string>("Password")
+                    b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("password");
+                        .HasColumnName("password_hash");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -481,7 +536,8 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Surname")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("surname");
 
                     b.HasKey("Id");
@@ -546,8 +602,7 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Student", "Leader")
                         .WithMany()
                         .HasForeignKey("LeaderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("wspolpracujmy.Models.Project", "Project")
                         .WithMany("Groups")
@@ -652,8 +707,7 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Group", "Group")
                         .WithMany("Members")
                         .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithOne("Student")

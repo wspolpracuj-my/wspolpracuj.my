@@ -11,6 +11,7 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania metadanymi plików w aplikacji.
     /// </summary>
@@ -43,6 +44,12 @@ namespace wspolpracujmy.Controllers
         [HttpGet("group/{groupId}")]
         public async Task<ActionResult<IEnumerable<FileEntity>>> GetByGroupId(int groupId)
         {
+            int currentUserId = GetCurrentUserId();
+            var group = await _db.Groups.Include(g => g.Project).ThenInclude(p => p.Company).FirstOrDefaultAsync(g => g.Id == groupId);
+            if (group == null) return NotFound();
+            if (group.Project.Company.UserId != currentUserId && !await _db.Students.AnyAsync(s => s.GroupId == groupId && s.UserId == currentUserId) && !IsAdmin())
+                return Forbid("No access to this group's files");
+
             var files = await _db.Files
                 .Where(f => f.GroupId == groupId)
                 .ToListAsync();
@@ -57,6 +64,12 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzony obiekt pliku z kodem 201 Created.</returns>
         public async Task<ActionResult<FileEntity>> Post(FileEntity file)
         {
+            int currentUserId = GetCurrentUserId();
+            var group = await _db.Groups.Include(g => g.Project).ThenInclude(p => p.Company).FirstOrDefaultAsync(g => g.Id == file.GroupId);
+            if (group == null) return NotFound("Group not found");
+            if (group.Project.Company.UserId != currentUserId && !await _db.Students.AnyAsync(s => s.GroupId == file.GroupId && s.UserId == currentUserId) && !IsAdmin())
+                return Forbid("No permission to upload file to this group");
+
             _db.Files.Add(file);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = file.Id }, file);
@@ -72,6 +85,11 @@ namespace wspolpracujmy.Controllers
         public async Task<IActionResult> Put(Guid id, FileEntity file)
         {
             if (id != file.Id) return BadRequest();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageFileAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to update this file");
+
             _db.Entry(file).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return NoContent();
@@ -87,9 +105,55 @@ namespace wspolpracujmy.Controllers
         {
             var f = await _db.Files.FindAsync(id);
             if (f == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageFileAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to delete this file");
+
             _db.Files.Remove(f);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
+        {
+            // Check if user is the company owner
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return false;
+            if (project.Company.UserId == userId) return true;
+
+            // Check if user is a member of a group in the project
+            var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student?.Group?.ProjectId == projectId) return true;
+
+            return false;
+        }
+
+        private async Task<bool> CanManageFileAsync(Guid fileId, int userId)
+        {
+            var groupFile = await _db.GroupFiles.Include(gf => gf.Group).ThenInclude(g => g.Project).ThenInclude(p => p.Company).FirstOrDefaultAsync(gf => gf.FileId == fileId);
+            if (groupFile == null) return false;
+
+            var group = groupFile.Group;
+
+            // Company owner can manage files in their projects
+            if (group.Project?.Company?.UserId == userId) return true;
+
+            // Group members can manage files in their group
+            var isMember = await _db.Students.AnyAsync(s => s.GroupId == group.Id && s.UserId == userId);
+            return isMember;
         }
     }
 }

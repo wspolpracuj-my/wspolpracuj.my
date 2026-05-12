@@ -4,12 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace wspolpracujmy.Controllers
 {
     // NOT DONE YET - just a draft to show the general idea of handling group requests and related notifications. Will be refined later.
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler obsługujący żądania związane z dołączaniem/odpowiedziami dotyczącymi grup.
     /// </summary>
@@ -28,6 +30,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         /// <summary>
         /// Tworzy nowe żądanie związane z grupą (np. dołączenie lub zaproszenie).
         /// </summary>
@@ -37,12 +40,17 @@ namespace wspolpracujmy.Controllers
         {
             if (dto == null) return BadRequest();
 
+            int currentUserId = GetCurrentUserId();
+
             var group = await _db.Groups.Include(g => g.Project).FirstOrDefaultAsync(g => g.Id == dto.GroupId);
             if (group == null) return NotFound($"Group with id {dto.GroupId} not found.");
 
             var student = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == dto.StudentId);
             if (student == null) return NotFound($"Student with id {dto.StudentId} not found.");
 
+            if (student.UserId != currentUserId && !IsAdmin()) return Forbid("No permission to create request for this student");
+
+            dto.CreatedByUserId = currentUserId;
             dto.CreatedAt = DateTime.UtcNow;
             _db.GroupRequests.Add(dto);
 
@@ -155,8 +163,13 @@ namespace wspolpracujmy.Controllers
         {
             if (dto == null) return BadRequest();
 
-            var req = await _db.GroupRequests.FindAsync(id);
+            var req = await _db.GroupRequests.Include(r => r.Group).ThenInclude(g => g.Project).ThenInclude(p => p.Company).FirstOrDefaultAsync(r => r.Id == id);
             if (req == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            // Check if user can respond: company owner or group leader
+            if (req.Group?.Project?.Company?.UserId != currentUserId && req.Group?.LeaderId != currentUserId && !IsAdmin())
+                return Forbid("No permission to respond to this request");
 
             if (req.Status == GroupStatus.Accepted || req.Status == GroupStatus.Declined)
             {
@@ -172,6 +185,7 @@ namespace wspolpracujmy.Controllers
 
             req.Status = action == "accept" ? GroupStatus.Accepted : GroupStatus.Declined;
             req.RespondedAt = DateTime.UtcNow;
+            req.RespondedByUserId = currentUserId;
 
             // If accepted and this is a student responding to an invite/join_request, assign student to the group
             if (action == "accept" && req.Type != null && req.Type.Equals("invite", StringComparison.OrdinalIgnoreCase))
@@ -192,7 +206,7 @@ namespace wspolpracujmy.Controllers
                     // If responder is the company owner -> company deciding about group's admission to project
                     var project = group?.Project;
                     var company = project != null ? await _db.Companies.FindAsync(project.CompanyId) : null;
-                    var responderIsCompany = company != null && dto.RespondedByUserId == company.UserId;
+                    var responderIsCompany = company != null && req.RespondedByUserId == company.UserId;
 
                     if (responderIsCompany)
                     {
@@ -248,6 +262,33 @@ namespace wspolpracujmy.Controllers
             await _db.SaveChangesAsync();
 
             return Ok(req);
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
+        {
+            // Check if user is the company owner
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return false;
+            if (project.Company.UserId == userId) return true;
+
+            // Check if user is a member of a group in the project
+            var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student?.Group?.ProjectId == projectId) return true;
+
+            return false;
         }
     }
 }

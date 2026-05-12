@@ -4,11 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.Models;
-
+using Microsoft.AspNetCore.Authorization;
 namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania encjami studenta.
     /// </summary>
@@ -21,40 +22,43 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         public StudentsController(AppDbContext db) => _db = db;
 
-        // [HttpGet]
-        // Removed: returning all students without filters/pagination.
-        // public async Task<IEnumerable<Student>> Get() => await _db.Students.ToListAsync();
+        [HttpGet]
+        /// <summary>
+        /// Pobiera listę studentów.
+        /// </summary>
+        /// <returns>Lista studentów.</returns>
+        public async Task<IEnumerable<Student>> Get() => await _db.Students.Include(s => s.User).ToListAsync();
 
-        // [HttpGet("{id:int}")]
-        // /// <summary>
-        // /// Pobiera studenta po identyfikatorze.
-        // /// </summary>
-        // /// <param name="id">Id studenta.</param>
-        // /// <returns>Obiekt studenta lub NotFound jeśli nie istnieje.</returns>
-        // public async Task<ActionResult<Student>> Get(int id)
-        // {
-        //     var s = await _db.Students.FindAsync(id);
-        //     if (s == null) return NotFound();
-        //     return s;
-        // }
+        [HttpGet("{id:int}")]
+        /// <summary>
+        /// Pobiera studenta po identyfikatorze.
+        /// </summary>
+        /// <param name="id">Id studenta.</param>
+        /// <returns>Obiekt studenta lub NotFound jeśli nie istnieje.</returns>
+        public async Task<ActionResult<Student>> Get(int id)
+        {
+            var s = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(x => x.Id == id);
+            if (s == null) return NotFound();
+            return s;
+        }
 
-        // [HttpPost]
-        // /// <summary>
-        // /// Tworzy nowego studenta w systemie.
-        // /// </summary>
-        // /// <param name="student">Obiekt studenta do utworzenia.</param>
-        // /// <returns>Utworzony student z kodem 201 Created.</returns>
-        // public async Task<ActionResult<Student>> Post(Student student)
-        // {
-        //     _db.Students.Add(student);
-        //     await _db.SaveChangesAsync();
-        //     return CreatedAtAction(nameof(Get), new { id = student.Id }, student);
-        // }
+        [HttpPost]
+        /// <summary>
+        /// Tworzy nowego studenta w systemie.
+        /// </summary>
+        /// <param name="student">Obiekt studenta do utworzenia.</param>
+        /// <returns>Utworzony student z kodem 201 Created.</returns>
+        public async Task<ActionResult<Student>> Post(Student student)
+        {
+            _db.Students.Add(student);
+            await _db.SaveChangesAsync();
+            return CreatedAtAction(nameof(Get), new { id = student.Id }, student);
+        }
 
         /// <summary>
         /// DTO używane do zmiany przypisania studenta do grupy.
         /// </summary>
-        public class ChangeStudentGroupDto { public int GroupId { get; set; } }
+        public class ChangeStudentGroupDto { public int? GroupId { get; set; } }
 
         [HttpPatch("{id:int}/group")]
         /// <summary>
@@ -70,10 +74,22 @@ namespace wspolpracujmy.Controllers
             var student = await _db.Students.FindAsync(id);
             if (student == null) return NotFound();
 
-            var group = await _db.Groups.FindAsync(dto.GroupId);
-            if (group == null) return BadRequest(new { error = "Group not found" });
+            int currentUserId = GetCurrentUserId();
+            if (student.UserId != currentUserId && !IsAdmin()) return Forbid("No permission to change this student's group");
 
-            student.GroupId = dto.GroupId;
+            // If GroupId is null, remove student from group
+            if (dto.GroupId == null)
+            {
+                student.GroupId = null;
+            }
+            else
+            {
+                var group = await _db.Groups.FindAsync(dto.GroupId);
+                if (group == null) return BadRequest(new { error = "Group not found" });
+
+                student.GroupId = dto.GroupId;
+            }
+
             await _db.SaveChangesAsync();
             return NoContent();
         }
@@ -93,5 +109,17 @@ namespace wspolpracujmy.Controllers
             return NoContent();
         }
 
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
     }
 }

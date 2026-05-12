@@ -12,6 +12,7 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania grupami studentów powiązanymi z projektami.
     /// </summary>
@@ -68,6 +69,13 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzona grupa z kodem 201 Created.</returns>
         public async Task<ActionResult<Group>> Post(Group group)
         {
+            int currentUserId = GetCurrentUserId();
+            // Check if user can access the project
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == group.ProjectId);
+            if (project == null) return NotFound("Project not found");
+            if (project.Company.UserId != currentUserId && !IsAdmin())
+                return Forbid("No permission to create group for this project");
+
             _db.Groups.Add(group);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(Get), new { id = group.Id }, group);
@@ -88,13 +96,54 @@ namespace wspolpracujmy.Controllers
             var group = await _db.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
             if (group == null) return NotFound();
 
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageGroupAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to update this group");
+
             patch.ApplyTo(group, ModelState);
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            // opcjonalnie: walidacja/autoryzacja tutaj
-
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpPut("{id:int}")]
+        /// <summary>
+        /// Aktualizuje istniejącą grupę - całość danych.
+        /// </summary>
+        /// <param name="id">Id grupy do zaktualizowania.</param>
+        /// <param name="updateData">Nowe dane grupy.</param>
+        /// <returns>Brak treści (204) gdy zakończono pomyślnie.</returns>
+        public async Task<IActionResult> Put(int id, [FromBody] dynamic updateData)
+        {
+            var group = await _db.Groups.FindAsync(id);
+            if (group == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageGroupAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to update this group");
+
+            try
+            {
+                if (updateData.name != null)
+                    group.Name = updateData.name;
+
+                if (updateData.projectId != null)
+                    group.ProjectId = updateData.projectId;
+
+                if (updateData.isAccepted != null)
+                    group.IsAccepted = updateData.isAccepted;
+
+                if (updateData.leaderId != null)
+                    group.LeaderId = updateData.leaderId;
+
+                await _db.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpDelete("{id:int}")]
@@ -107,6 +156,11 @@ namespace wspolpracujmy.Controllers
         {
             var g = await _db.Groups.FindAsync(id);
             if (g == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageGroupAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to delete this group");
+
             _db.Groups.Remove(g);
             await _db.SaveChangesAsync();
             return NoContent();
@@ -172,6 +226,35 @@ namespace wspolpracujmy.Controllers
 
             if (dto == null) return NotFound();
             return Ok(dto);
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanManageGroupAsync(int groupId, int userId)
+        {
+            var group = await _db.Groups.Include(g => g.Project).ThenInclude(p => p.Company).FirstOrDefaultAsync(g => g.Id == groupId);
+            if (group == null) return false;
+
+            // Company owner can manage groups in their projects
+            if (group.Project.Company.UserId == userId) return true;
+
+            // Group leader can manage their group
+            if (group.LeaderId == userId) return true;
+
+            // Group members can view/manage their group (for some actions)
+            var isMember = await _db.Students.AnyAsync(s => s.GroupId == groupId && s.UserId == userId);
+            return isMember;
         }
     }
 }

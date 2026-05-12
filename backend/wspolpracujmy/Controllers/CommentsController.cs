@@ -10,6 +10,7 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do obsługi komentarzy związanych z projektami.
     /// </summary>
@@ -45,6 +46,9 @@ namespace wspolpracujmy.Controllers
             var exists = await _db.Projects.AnyAsync(p => p.Id == projectId);
             if (!exists) return NotFound();
 
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(projectId, currentUserId)) return Forbid();
+
             var comments = await _projectCommentService.GetCommentsForProjectAsync(projectId);
             return Ok(comments);
         }
@@ -66,6 +70,9 @@ namespace wspolpracujmy.Controllers
 
             var groupExists = await _db.Groups.AnyAsync(g => g.Id == groupId && g.ProjectId == projectId);
             if (!groupExists) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(projectId, currentUserId)) return Forbid();
 
             var comments = await _projectCommentService.GetCommentsForProjectByGroupAsync(projectId, groupId);
             return Ok(comments);
@@ -90,6 +97,11 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<Comment>> Post([FromBody] CreateCommentDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            int currentUserId = GetCurrentUserId();
+            if (dto.UserId != currentUserId) return Forbid("Cannot comment as another user");
+
+            if (!await CanAccessProjectAsync(dto.ProjectId, currentUserId)) return Forbid("No access to this project");
 
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == dto.ProjectId);
             if (project == null) return NotFound($"Project with id {dto.ProjectId} not found.");
@@ -174,6 +186,9 @@ namespace wspolpracujmy.Controllers
                 .FirstOrDefaultAsync(cm => cm.Id == id);
             if (c == null) return NotFound();
 
+            int currentUserId = GetCurrentUserId();
+            if (c.UserId != currentUserId && !IsAdmin()) return Forbid("No permission to delete this comment");
+
             // Best-effort: try to find unread notifications related to this comment's author
             // Notifications created for comments use LinkTarget = "project:{projectId}" and
             // the Content contains either "Student {Name} {Surname}" or "Zespół {groupName}".
@@ -225,6 +240,33 @@ namespace wspolpracujmy.Controllers
             _db.Comments.Remove(c);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
+        {
+            // Check if user is the company owner
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return false;
+            if (project.Company.UserId == userId) return true;
+
+            // Check if user is a member of a group in the project
+            var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student?.Group?.ProjectId == projectId) return true;
+
+            return false;
         }
     }
 }

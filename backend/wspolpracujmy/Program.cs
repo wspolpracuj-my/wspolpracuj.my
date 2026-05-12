@@ -89,10 +89,12 @@ if (app.Environment.IsDevelopment())
     // Seed development data (runs only in Development)
     await TestDataSeeder.SeedAsync(app);
 }
+app.UseCors(AllowFrontend);
 
-app.UseAuthentication();
 app.UseAuthorization();
+app.UseAuthentication();
+
 
 app.MapControllers();
-app.UseCors(AllowFrontend);
+
 app.Run();

@@ -4,16 +4,17 @@ using wspolpracujmy.Data;
 using wspolpracujmy.DTOs.Auth;
 using wspolpracujmy.Models;
 using wspolpracujmy.Services;
-
+using Microsoft.AspNetCore.Authorization;
 namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly JwtTokenService _jwtTokenService;
-
+        
         public AuthController(AppDbContext context, JwtTokenService jwtTokenService)
         {
             _context = context;
@@ -21,6 +22,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
         {
             // Sprawdź czy login już istnieje
@@ -38,7 +40,7 @@ namespace wspolpracujmy.Controllers
                 Surname = request.Surname,
                 Login = request.Login,
                 PasswordHash = passwordHash,
-                Role = request.Role
+                Role = Role.Student
             };
 
             _context.Users.Add(user);
@@ -60,6 +62,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Login == request.Login);

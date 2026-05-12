@@ -12,6 +12,7 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania projektami, podsumowaniami i powiązanymi zasobami.
     /// </summary>
@@ -57,10 +58,15 @@ namespace wspolpracujmy.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            int currentUserId = GetCurrentUserId();
+
             // load related entities
             var company = await _db.Companies.FindAsync(dto.CompanyId);
             if (company == null)
                 return NotFound($"Company with id {dto.CompanyId} not found.");
+
+            if (company.UserId != currentUserId && !IsAdmin())
+                return Forbid("No permission to create project for this company");
 
             var meetingType = await _db.Meeting_types.FindAsync(dto.MeetingTypeId);
             if (meetingType == null)
@@ -108,6 +114,10 @@ namespace wspolpracujmy.Controllers
             var project = await _db.Projects.FindAsync(id);
             if (project == null) return NotFound();
 
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to update this project");
+
             // load related entities
             var company = await _db.Companies.FindAsync(dto.CompanyId);
             if (company == null)
@@ -150,6 +160,11 @@ namespace wspolpracujmy.Controllers
         {
             var p = await _db.Projects.FindAsync(id);
             if (p == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to delete this project");
+
             _db.Projects.Remove(p);
             await _db.SaveChangesAsync();
             return NoContent();
@@ -231,6 +246,39 @@ namespace wspolpracujmy.Controllers
 
             if (dto == null) return NotFound();
             return Ok(dto);
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
+        {
+            // Check if user is the company owner
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return false;
+            if (project.Company.UserId == userId) return true;
+
+            // Check if user is a member of a group in the project
+            var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student?.Group?.ProjectId == projectId) return true;
+
+            return false;
+        }
+
+        private async Task<bool> CanManageCompanyAsync(int companyId, int userId)
+        {
+            var company = await _db.Companies.FindAsync(companyId);
+            return company?.UserId == userId;
         }
     }
 }

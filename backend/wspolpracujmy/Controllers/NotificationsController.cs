@@ -10,6 +10,7 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania powiadomieniami użytkowników.
     /// </summary>
@@ -45,10 +46,10 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<NotificationDto>>> GetForUser([FromQuery] int? userId)
+        public async Task<ActionResult<IEnumerable<NotificationDto>>> GetForUser()
         {
-            if (!userId.HasValue) return BadRequest("userId query parameter is required.");
-            var list = await _notifications.GetNotificationsForUserAsync(userId.Value);
+            int currentUserId = GetCurrentUserId();
+            var list = await _notifications.GetNotificationsForUserAsync(currentUserId);
             return Ok(list);
         }
 
@@ -71,6 +72,13 @@ namespace wspolpracujmy.Controllers
             if (ids == null || ids.Length == 0) return BadRequest("ids required");
             await _notifications.MarkAsReadAsync(ids);
             return NoContent();
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
         }
     }
 }

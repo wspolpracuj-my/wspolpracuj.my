@@ -5,14 +5,14 @@
 namespace wspolpracujmy.Migrations
 {
     /// <inheritdoc />
-    public partial class MakeLeaderNullable : Migration
+    public partial class MakeStudentGroupIdNullable : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<int>(
-                name: "leader_id",
-                table: "Groups",
+                name: "group_id",
+                table: "Students",
                 type: "integer",
                 nullable: true,
                 oldClrType: typeof(int),
@@ -23,8 +23,8 @@ namespace wspolpracujmy.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<int>(
-                name: "leader_id",
-                table: "Groups",
+                name: "group_id",
+                table: "Students",
                 type: "integer",
                 nullable: false,
                 defaultValue: 0,

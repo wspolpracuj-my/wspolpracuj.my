@@ -10,6 +10,7 @@ namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania firmami i ich danymi.
     /// </summary>
@@ -114,6 +115,10 @@ namespace wspolpracujmy.Controllers
             var company = await _db.Companies.FindAsync(id);
             if (company == null) return NotFound();
 
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageCompanyAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to update this company");
+
             var user = await _db.Users.FindAsync(dto.UserId);
             if (user == null) return NotFound($"User with id {dto.UserId} not found.");
 
@@ -137,9 +142,32 @@ namespace wspolpracujmy.Controllers
         {
             var c = await _db.Companies.FindAsync(id);
             if (c == null) return NotFound();
+
+            int currentUserId = GetCurrentUserId();
+            if (!await CanManageCompanyAsync(id, currentUserId) && !IsAdmin())
+                return Forbid("No permission to delete this company");
+
             _db.Companies.Remove(c);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
+        }
+
+        private async Task<bool> CanManageCompanyAsync(int companyId, int userId)
+        {
+            var company = await _db.Companies.FindAsync(companyId);
+            return company?.UserId == userId;
         }
     }
 }

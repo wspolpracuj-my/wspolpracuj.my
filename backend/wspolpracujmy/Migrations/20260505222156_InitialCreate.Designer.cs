@@ -12,8 +12,8 @@ using wspolpracujmy.Data;
 namespace wspolpracujmy.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260425190723_GroupRequestStatusEnumChange")]
-    partial class GroupRequestStatusEnumChange
+    [Migration("20260505222156_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -144,6 +144,10 @@ namespace wspolpracujmy.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("gcs_object_name");
+
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
 
                     b.Property<string>("OriginalName")
                         .IsRequired()
@@ -510,18 +514,20 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Login")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("login");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<string>("Password")
+                    b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("password");
+                        .HasColumnName("password_hash");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -530,7 +536,8 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Surname")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("surname");
 
                     b.HasKey("Id");

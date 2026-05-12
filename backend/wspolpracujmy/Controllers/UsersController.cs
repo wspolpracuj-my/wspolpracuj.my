@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do zarządzania użytkownikami aplikacji.
     /// </summary>
@@ -87,9 +89,25 @@ namespace wspolpracujmy.Controllers
         {
             var u = await _db.Users.FindAsync(id);
             if (u == null) return NotFound();
+
+            if (!IsAdmin()) return Forbid("Only admin can delete users");
+
             _db.Users.Remove(u);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
+            return int.Parse(claim.Value);
+        }
+
+        private bool IsAdmin()
+        {
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            return roleClaim?.Value == "Admin";
         }
     }
 }

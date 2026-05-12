@@ -116,8 +116,10 @@ document.querySelector("#login form").addEventListener("submit", async (e) => {
             localStorage.setItem("token", data.token);
             localStorage.setItem("user", JSON.stringify(data));
             
-            if (data.role === "Company") {
+            if (data.role === "Company" || data.role ===2) {
                 window.location.href = "firma.html";
+            } else if (data.role === "Student" || data.role === 1) {
+                window.location.href = "student.html";
             } else {
                 alert("Panel studenta niedostępny");
             }
@@ -139,7 +141,7 @@ document.querySelector("#register form").addEventListener("submit", async (e) =>
         login: inputs[2].value,
         email: inputs[3].value,
         password: inputs[4].value,
-        role: "Company"
+        role: "Student" // Domyślnie rejestrujemy jako student, można dodać wybór roli
     };
 
     try {
@@ -154,7 +156,7 @@ document.querySelector("#register form").addEventListener("submit", async (e) =>
         if (res.ok) {
             localStorage.setItem("token", result.token);
             localStorage.setItem("user", JSON.stringify(result));
-            window.location.href = "firma.html";
+            window.location.href = "index.html";
         } else {
             alert(result.message || "Błąd rejestracji");
         }

@@ -47,5 +47,8 @@ namespace wspolpracujmy.Models
 
         [JsonIgnore]
         public ICollection<CalendarEvent> CalendarEvents { get; set; } = new List<CalendarEvent>();
+
+        [JsonIgnore]
+        public ICollection<GroupRequest> GroupRequests { get; set; } = new List<GroupRequest>();
     }
 }

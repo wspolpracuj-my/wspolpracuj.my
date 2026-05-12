@@ -463,7 +463,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("email");
 
-                    b.Property<int>("GroupId")
+                    b.Property<int?>("GroupId")
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
@@ -704,8 +704,7 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Group", "Group")
                         .WithMany("Members")
                         .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithOne("Student")

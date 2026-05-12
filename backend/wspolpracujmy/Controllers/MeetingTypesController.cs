@@ -4,11 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.Models;
-
+using Microsoft.AspNetCore.Authorization;
 namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     /// <summary>
     /// Kontroler do pobierania typów spotkań dostępnych w aplikacji.
     /// </summary>

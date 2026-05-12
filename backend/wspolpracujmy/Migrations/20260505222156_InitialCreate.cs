@@ -13,6 +13,25 @@ namespace wspolpracujmy.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "GroupRequests",
+                columns: table => new
+                {
+                    id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    group_id = table.Column<int>(type: "integer", nullable: false),
+                    student_id = table.Column<int>(type: "integer", nullable: false),
+                    created_by_user_id = table.Column<int>(type: "integer", nullable: false),
+                    status = table.Column<string>(type: "text", nullable: false),
+                    type = table.Column<string>(type: "text", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    responded_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GroupRequests", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Meeting_types",
                 columns: table => new
                 {
@@ -44,11 +63,11 @@ namespace wspolpracujmy.Migrations
                 {
                     id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    name = table.Column<string>(type: "text", nullable: false),
-                    surname = table.Column<string>(type: "text", nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    surname = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     role = table.Column<string>(type: "text", nullable: false),
-                    login = table.Column<string>(type: "text", nullable: false),
-                    password = table.Column<string>(type: "text", nullable: false)
+                    login = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    password_hash = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -82,6 +101,7 @@ namespace wspolpracujmy.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<int>(type: "integer", nullable: false),
+                    group_id = table.Column<int>(type: "integer", nullable: true),
                     original_name = table.Column<string>(type: "text", nullable: false),
                     gcs_bucket = table.Column<string>(type: "text", nullable: false),
                     gcs_object_name = table.Column<string>(type: "text", nullable: false),
@@ -108,7 +128,9 @@ namespace wspolpracujmy.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     user_id = table.Column<int>(type: "integer", nullable: false),
                     content = table.Column<string>(type: "text", nullable: false),
-                    status = table.Column<string>(type: "text", nullable: false)
+                    status = table.Column<string>(type: "text", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    link_target = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -281,8 +303,7 @@ namespace wspolpracujmy.Migrations
                     name = table.Column<string>(type: "text", nullable: false),
                     project_id = table.Column<int>(type: "integer", nullable: false),
                     is_accepted = table.Column<string>(type: "text", nullable: false),
-                    leader_id = table.Column<int>(type: "integer", nullable: false),
-                    number_of_members = table.Column<int>(type: "integer", nullable: false)
+                    leader_id = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -441,6 +462,9 @@ namespace wspolpracujmy.Migrations
 
             migrationBuilder.DropTable(
                 name: "GroupFiles");
+
+            migrationBuilder.DropTable(
+                name: "GroupRequests");
 
             migrationBuilder.DropTable(
                 name: "Notifications");
