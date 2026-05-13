@@ -436,8 +436,8 @@ namespace wspolpracujmy.Controllers
                             var members = await _db.Students.Where(s => s.GroupId == group.Id).ToListAsync();
                             foreach (var m in members)
                             {
-                                var content = action == "accept" ? $"Zespół {group.Name} został przyjęty do projektu {project?.Topic}." : $"Zespół {group.Name} nie został przyjęty do projektu {project?.Topic}.";
-                                await _notifications.CreateNotificationAsync(m.UserId, content, $"project:{project?.Id}");
+                                var content = action == "accept" ? $"Zespół {group.Name} został przyjęty do projektu {project.Topic}." : $"Zespół {group.Name} nie został przyjęty do projektu {project.Topic}.";
+                                await _notifications.CreateNotificationAsync(m.UserId, content, $"project:{project.Id}");
                             }
                         }
                     }
