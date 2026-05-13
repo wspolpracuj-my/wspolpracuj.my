@@ -362,47 +362,44 @@ namespace wspolpracujmy.Controllers
             req.RespondedAt = DateTime.UtcNow;
             req.RespondedByUserId = currentUserId;
 
-            if (action == "accept" && req.Type != null && (req.Type.Equals("invite", StringComparison.OrdinalIgnoreCase) || req.Type.Equals("invitation", StringComparison.OrdinalIgnoreCase)))
+            if (action == "accept" && req.Type != null && (req.Type.Equals("invite", StringComparison.OrdinalIgnoreCase) || req.Type.Equals("invitation", StringComparison.OrdinalIgnoreCase)) && targetStudent != null)
             {
-                if (targetStudent != null)
-                {
-                    var project = group?.Project ?? (group?.ProjectId.HasValue == true ? await _db.Projects.FindAsync(group?.ProjectId?.Value) : null);
-                    var currentMembers = group?.Members?.Count ?? (await _db.Students.CountAsync(s => s.GroupId == req.GroupId));
-                    if (project != null && currentMembers >= project.MaxNumberGroupMembers) return BadRequest($"Grupa ma już {currentMembers} członków, co przekracza maksymalny limit projektu ({project.MaxNumberGroupMembers}).");
+                var project = group?.Project ?? (group?.ProjectId.HasValue == true ? await _db.Projects.FindAsync(group?.ProjectId?.Value) : null);
+                var currentMembers = group?.Members?.Count ?? (await _db.Students.CountAsync(s => s.GroupId == req.GroupId));
+                if (project != null && currentMembers >= project.MaxNumberGroupMembers) return BadRequest($"Grupa ma już {currentMembers} członków, co przekracza maksymalny limit projektu ({project.MaxNumberGroupMembers}).");
 
-                    // Persist membership change directly via SQL to avoid tracking/merge issues in this flow
-                    var affected = await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Students\" SET group_id = {req.GroupId} WHERE id = {targetStudent.Id}");
-                    if (affected == 0)
+                // Persist membership change directly via SQL to avoid tracking/merge issues in this flow
+                var affected = await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Students\" SET group_id = {req.GroupId} WHERE id = {targetStudent.Id}");
+                if (affected == 0)
+                {
+                    // fallback: update via EF if raw SQL didn't affect any row
+                    targetStudent.GroupId = req.GroupId;
+                    _db.Students.Update(targetStudent);
+                    await _db.SaveChangesAsync();
+                }
+                // reload tracked entity so further queries in this context see updated value
+                try
+                {
+                    await _db.Entry(targetStudent).ReloadAsync();
+                }
+                catch
+                {
+                    // ignore reload failures
+                }
+                // notify all current/future members that a student joined the group
+                try
+                {
+                    var members = await _db.Students.Where(s => s.GroupId == req.GroupId).ToListAsync();
+                    var joinerName = targetStudent.User != null ? $"{targetStudent.User.Name} {targetStudent.User.Surname}" : targetStudent.Email;
+                    var contentJoin = $"Student {joinerName} dołączył do zespołu {group?.Name}.";
+                    foreach (var m in members)
                     {
-                        // fallback: update via EF if raw SQL didn't affect any row
-                        targetStudent.GroupId = req.GroupId;
-                        _db.Students.Update(targetStudent);
-                        await _db.SaveChangesAsync();
+                        await _notifications.CreateNotificationAsync(m.UserId, contentJoin, $"group:{group?.Id}");
                     }
-                    // reload tracked entity so further queries in this context see updated value
-                    try
-                    {
-                        await _db.Entry(targetStudent).ReloadAsync();
-                    }
-                    catch
-                    {
-                        // ignore reload failures
-                    }
-                    // notify all current/future members that a student joined the group
-                    try
-                    {
-                        var members = await _db.Students.Where(s => s.GroupId == req.GroupId).ToListAsync();
-                        var joinerName = targetStudent.User != null ? $"{targetStudent.User.Name} {targetStudent.User.Surname}" : targetStudent.Email;
-                        var contentJoin = $"Student {joinerName} dołączył do zespołu {group?.Name}.";
-                        foreach (var m in members)
-                        {
-                            await _notifications.CreateNotificationAsync(m.UserId, contentJoin, $"group:{group?.Id}");
-                        }
-                    }
-                    catch
-                    {
-                        // ignore notification errors
-                    }
+                }
+                catch
+                {
+                    // ignore notification errors
                 }
             }
 
