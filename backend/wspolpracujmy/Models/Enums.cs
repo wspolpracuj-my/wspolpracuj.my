@@ -2,6 +2,9 @@ using System;
 
 namespace wspolpracujmy.Models
 {
+    /// <summary>
+    /// Role użytkowników w aplikacji.
+    /// </summary>
     public enum Role
     {
         Admin,
@@ -9,25 +12,38 @@ namespace wspolpracujmy.Models
         Company
     }
 
+    /// <summary>
+    /// Status grupy w procesie akceptacji.
+    /// </summary>
     public enum GroupStatus
     {
         Pending,
         Accepted,
-        Declined
+        Declined,
+        Cancelled
     }
 
+    /// <summary>
+    /// Obsługiwane języki dokumentów/treści.
+    /// </summary>
     public enum LanguageDoc
     {
         Polish,
         English
     }
 
+    /// <summary>
+    /// Status powiadomienia (przeczytane/nieprzeczytane).
+    /// </summary>
     public enum NotificationStatus
     {
         NotRead,
         Read
     }
 
+    /// <summary>
+    /// Priorytety używane w zadaniach lub powiadomieniach.
+    /// </summary>
     public enum Priority
     {
         P1 = 1,

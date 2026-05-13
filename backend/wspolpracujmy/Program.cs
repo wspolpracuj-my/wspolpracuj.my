@@ -5,8 +5,26 @@ using Microsoft.OpenApi;
 using System.Text;
 using wspolpracujmy.Data;
 using wspolpracujmy.Services;
+using Microsoft.AspNetCore.Authorization;
+using wspolpracujmy.Services.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+const string AllowFrontend = "AllowFrontend";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(AllowFrontend, policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5500",
+                "http://127.0.0.1:5500"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers().AddNewtonsoftJson();
@@ -33,7 +51,15 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Application services
+builder.Services.AddScoped<wspolpracujmy.Services.ProjectService>();
+builder.Services.AddScoped<wspolpracujmy.Services.ProjectCommentService>();
+builder.Services.AddScoped<wspolpracujmy.Services.NotificationService>();
+builder.Services.AddScoped<wspolpracujmy.Services.GroupRequestService>();
+
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<GroupAuthorizationService>();
+builder.Services.AddScoped<IAuthorizationHandler, GroupOwnerHandler>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"] ?? throw new ArgumentNullException("SecretKey not configured");
@@ -57,19 +83,36 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CompanyOnly", policy => policy.RequireRole("Company", "Admin"));
+    options.AddPolicy("StudentOnly", policy => policy.RequireRole("Student"));
+    options.AddPolicy("GroupOwner", policy => policy.Requirements.Add(new GroupOwnerRequirement()));
+});
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
+// (dev-only truncation was run temporarily and removed)
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    // Seed development data (runs only in Development)
+    // First run the dedicated TagsSeeder so tag names are controlled separately.
+    await TagsSeeder.SeedAsync(app);
     await TestDataSeeder.SeedAsync(app);
 }
-
+app.UseCors(AllowFrontend);
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
 app.Run();

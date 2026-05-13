@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel admina - wspolpracuj.my</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="app">
+    <main class="content">
+
+        <header class="topbar">
+            <div class="brand">
+                <h2 class="logo">wspolpracuj.my</h2>
+                <p class="account-type">Panel admina</p>
+            </div>
+
+            <div class="user-menu">
+                <button class="user-menu-toggle" onclick="toggleUserMenu(event)" aria-expanded="false">
+                    <span class="user-avatar">A</span>
+                    <span class="user-name">Admin</span>
+                    <span class="user-arrow">⌄</span>
+                </button>
+
+                <div id="userDropdown" class="user-dropdown">
+                    <button onclick="logout()">Wyloguj</button>
+                </div>
+            </div>
+        </header>
+
+        <section id="dashboard" class="view active-view">
+            <div class="admin-start-box">
+                <p class="small-label">Panel administratora</p>
+                <h1>Cześć, admin</h1>
+
+                <div class="admin-menu-grid">
+                    <button onclick="showStudents()">STUDENCI</button>
+                    <button onclick="showTeams()">ZESPOŁY</button>
+                    <button onclick="showCompanies()">FIRMY</button>
+                    <button onclick="showProjects()">PROJEKTY</button>
+                    <button onclick="showNotifications()">POWIADOMIENIA</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="students" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Studenci</h2>
+                    <p class="muted">Lista wszystkich studentów.</p>
+                </div>
+            </div>
+
+            <div id="studentsList" class="admin-list scroll-list"></div>
+        </section>
+
+        <section id="teams" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Zespoły</h2>
+                    <p class="muted">Lista wszystkich zespołów.</p>
+                </div>
+            </div>
+
+            <div id="teamsList" class="team-list scroll-list"></div>
+        </section>
+
+        <section id="companies" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Firmy</h2>
+                    <p class="muted">Zarządzaj firmami na platformie.</p>
+                </div>
+
+                <button class="small-primary" onclick="showAddCompany()">+ Dodaj firmę</button>
+            </div>
+
+            <div id="companiesList" class="admin-list scroll-list"></div>
+        </section>
+
+        <section id="projects" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Projekty</h2>
+                    <p class="muted">Lista wszystkich projektów.</p>
+                </div>
+            </div>
+
+            <div id="projectsList" class="admin-project-list scroll-list"></div>
+        </section>
+
+        <section id="notifications" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Powiadomienia</h2>
+                    <p class="muted">Wyświetlanie wszystkich powiadomień od najnowszych.</p>
+                </div>
+            </div>
+
+            <div id="allNotifications" class="notification-list card"></div>
+        </section>
+
+        <section id="addCompany" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Dodaj firmę</h2>
+                    <p class="muted">Wprowadź dane firmy, aby dodać ją do systemu.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="addCompany(event)">
+                <label>
+                    Nazwa firmy
+                    <input id="newCompanyName" type="text" placeholder="Nazwa firmy">
+                </label>
+
+                <label>
+                    Login
+                    <input id="newCompanyLogin" type="text" placeholder="Login">
+                </label>
+
+                <label>
+                    Hasło
+                    <input id="newCompanyPassword" type="password" placeholder="Hasło">
+                </label>
+
+                <label>
+                    Powtórz hasło
+                    <input id="newCompanyRepeatPassword" type="password" placeholder="Powtórz hasło">
+                </label>
+
+                <button type="submit">Dodaj firmę</button>
+                <p id="addCompanyMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="deleteConfirm" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2 id="deleteTitle">Usuń</h2>
+                    <p id="deleteText" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="card confirm-card">
+                <button class="danger-main" onclick="confirmDelete()">Usuń</button>
+                <button class="cancel-main" onclick="cancelDelete()">Nie</button>
+            </div>
+        </section>
+
+        <section id="projectDetails" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Wybrany projekt</p>
+                    <h2 id="projectDetailsTitle"></h2>
+                    <p id="projectDetailsInfo" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="quick-actions project-actions">
+                <button onclick="showProjectTeams()">Zespoły</button>
+                <button onclick="showProjectGuidelines()">Wytyczne</button>
+                <button onclick="showProjectComments()">Komentarze</button>
+            </div>
+
+            <div class="card details-card project-hidden-details">
+                <h3>Opis</h3>
+                <p id="projectDetailsDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="projectDetailsGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="projectDetailsWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="projectDetailsTechResources"></p>
+
+                <h3>Dane projektu</h3>
+                <div class="info-grid">
+                    <div>
+                        <span>Zleceniodawca</span>
+                        <strong id="projectDetailsCompany"></strong>
+                    </div>
+
+                    <div>
+                        <span>Zapełnienie</span>
+                        <strong id="projectDetailsTeams"></strong>
+                    </div>
+
+                    <div>
+                        <span>Priorytet</span>
+                        <strong id="projectDetailsPriority"></strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="projectComments" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Komentarze</h2>
+                    <p class="muted">Admin widzi wszystkie komentarze do projektu.</p>
+                </div>
+            </div>
+
+            <div id="projectCommentsList" class="card comment-list"></div>
+        </section>
+
+        <section id="projectGuidelines" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Wytyczne</h2>
+                    <p class="muted">Dane projektu wypełnione przez firmę. Widok tylko do odczytu.</p>
+                </div>
+            </div>
+
+            <div class="card details-card">
+                <h3>Temat</h3>
+                <p id="guidelinesTopic"></p>
+
+                <h3>Zleceniodawca</h3>
+                <p id="guidelinesCompany"></p>
+
+                <h3>Opis</h3>
+                <p id="guidelinesDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="guidelinesGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="guidelinesWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="guidelinesTechResources"></p>
+
+                <h3>Tagi</h3>
+                <div id="guidelinesTags" class="selected-tags"></div>
+            </div>
+        </section>
+
+        <section id="projectTeams" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Zespoły</h2>
+                    <p class="muted">Lista zespołów zaakceptowanych przez firmę do projektu.</p>
+                </div>
+            </div>
+
+            <div id="projectTeamsList" class="team-list scroll-list"></div>
+        </section>
+
+        <section id="teamDetails" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Okno zespołu</p>
+                    <h2 id="teamDetailsName"></h2>
+                    <p id="teamDetailsProject" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="card details-card team-details-card">
+                <h3>Członkowie zespołu</h3>
+                <ol id="teamDetailsMembers" class="members-list"></ol>
+
+                <button id="repositoryButton" class="small-primary hidden" onclick="showRepository()">Repozytorium</button>
+            </div>
+        </section>
+
+        <section id="repository" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Pliki</p>
+                    <h2>PLIKI</h2>
+                    <p id="repositoryDescription" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="card repository-box">
+                <h3>Pliki</h3>
+
+                <div class="upload-area">
+                    <p>
+                        Miejsce na wrzucanie plików z rozszerzeniami według dokumentacji.
+                    </p>
+
+                    <input type="file" multiple>
+                </div>
+
+                <ul id="repositoryFiles" class="file-list"></ul>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+let currentProjectId = null;
+let currentTeamId = null;
+let currentProjectDetails = null;
+
+let deleteData = {
+    type: null,
+    id: null,
+    returnView: null
+};
+
+const viewHistory = [];
+
+const API_BASE = "http://localhost:8081/api";
+const authToken = localStorage.getItem("token");
+const currentUser = safeParseJson(localStorage.getItem("user"));
+
+let students = [];
+
+let companies = [];
+
+let projects = [];
+
+let teams = [];
+
+let notifications = [];
+
+let comments = [];
+
+let repositoryFiles = [];
+
+const priorityLabels = {
+    1: "1 - bardzo niski",
+    2: "2 - niski",
+    3: "3 - średni",
+    4: "4 - wysoki",
+    5: "5 - bardzo wysoki"
+};
+
+function safeParseJson(value) {
+    try {
+        return JSON.parse(value);
+    } catch {
+        return null;
+    }
+}
+
+function buildHeaders(json = true) {
+    const headers = {};
+    if (json) {
+        headers["Content-Type"] = "application/json";
+    }
+    if (authToken) {
+        headers["Authorization"] = `Bearer ${authToken}`;
+    }
+    return headers;
+}
+
+function isAdminUser() {
+    if (!currentUser) {
+        return false;
+    }
+
+    if (typeof currentUser.role === "string") {
+        return currentUser.role.toLowerCase() === "admin";
+    }
+
+    return currentUser.role === 0 || currentUser.role === "0";
+}
+
+function ensureAdmin() {
+    if (!authToken || !currentUser || !isAdminUser()) {
+        window.location.href = "index.html";
+        return false;
+    }
+
+    const avatar = document.querySelector(".user-avatar");
+    const name = document.querySelector(".user-name");
+    const userName = [currentUser.name, currentUser.surname].filter(Boolean).join(" ");
+
+    if (avatar) {
+        avatar.textContent = (currentUser.name || "A")[0]?.toUpperCase() || "A";
+    }
+
+    if (name) {
+        name.textContent = userName || "Admin";
+    }
+
+    return true;
+}
+
+async function apiGet(path) {
+    const response = await fetch(`${API_BASE}${path}`, {
+        headers: buildHeaders()
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || response.statusText);
+    }
+
+    return response.json();
+}
+
+async function loadStudents() {
+    const data = await apiGet("/users/students");
+    students = data.map(student => ({
+        id: student.studentId,
+        userId: student.userId,
+        fullName: `${student.name || ""} ${student.surname || ""}`.trim(),
+        details: `ID użytkownika: ${student.userId}`
+    }));
+}
+
+async function loadCompanies() {
+    const data = await apiGet("/companies");
+    companies = data.map(company => ({
+        id: company.id,
+        name: company.companyName,
+        contactEmail: company.contactEmail || "Brak kontaktu"
+    }));
+}
+
+async function loadProjects() {
+    const data = await apiGet("/projects");
+    projects = data.map(project => ({
+        id: project.id,
+        topic: project.topic,
+        companyName: project.companyName,
+        currentGroupsCount: project.currentGroupsCount,
+        maxGroups: project.maxGroups
+    }));
+}
+
+async function loadTeams() {
+    const data = await apiGet("/groups");
+    teams = data.map(team => ({
+        id: team.id,
+        name: team.name,
+        projectId: team.projectId,
+        status: team.isAccepted === true ? "accepted" : team.isAccepted === false ? "rejected" : "pending",
+        members: [],
+        memberCount: team.memberCount || 0
+    }));
+}
+
+async function loadNotifications() {
+    const data = await apiGet("/notifications/all");
+    notifications = data.map(notification => ({
+        id: notification.id,
+        title: notification.userName || `Użytkownik ${notification.userId}`,
+        text: notification.content || "",
+        date: notification.createdAt ? new Date(notification.createdAt).toLocaleString("pl-PL") : ""
+    }));
+}
+
+async function loadInitialData() {
+    if (!ensureAdmin()) {
+        return;
+    }
+
+    try {
+        await Promise.all([
+            loadStudents(),
+            loadCompanies(),
+            loadProjects(),
+            loadTeams(),
+            loadNotifications()
+        ]);
+
+        renderStudents();
+        renderTeams();
+        renderCompanies();
+        renderProjects();
+        renderNotifications();
+    } catch (error) {
+        console.error("Błąd ładowania danych:", error);
+        const dashboard = document.getElementById("dashboard");
+        if (dashboard) {
+            dashboard.innerHTML = `
+                <div class="admin-start-box">
+                    <p class="small-label">Błąd</p>
+                    <h1>Nie udało się załadować danych</h1>
+                    <p class="muted">${escapeHtml(error.message)}</p>
+                </div>
+            `;
+        }
+    }
+}
+
+function showView(viewId, saveHistory = true) {
+    const currentView = document.querySelector(".active-view");
+
+    if (currentView && saveHistory && currentView.id !== viewId) {
+        viewHistory.push(currentView.id);
+    }
+
+    document.querySelectorAll(".view").forEach(view => {
+        view.classList.remove("active-view");
+    });
+
+    document.getElementById(viewId).classList.add("active-view");
+}
+
+function goBack() {
+    const previousView = viewHistory.pop();
+
+    if (previousView) {
+        showView(previousView, false);
+    } else {
+        showView("dashboard", false);
+    }
+}
+
+function toggleUserMenu(event) {
+    event.stopPropagation();
+
+    const menu = document.querySelector(".user-menu");
+    const toggle = document.querySelector(".user-menu-toggle");
+
+    menu.classList.toggle("open");
+
+    const isOpen = menu.classList.contains("open");
+    toggle.setAttribute("aria-expanded", isOpen);
+}
+
+document.addEventListener("click", function(event) {
+    const menu = document.querySelector(".user-menu");
+
+    if (!menu) {
+        return;
+    }
+
+    if (!menu.contains(event.target)) {
+        menu.classList.remove("open");
+
+        const toggle = document.querySelector(".user-menu-toggle");
+
+        if (toggle) {
+            toggle.setAttribute("aria-expanded", "false");
+        }
+    }
+});
+
+function logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "index.html";
+}
+
+function showStudents() {
+    renderStudents();
+    showView("students");
+}
+
+function showTeams() {
+    renderTeams();
+    showView("teams");
+}
+
+function showCompanies() {
+    renderCompanies();
+    showView("companies");
+}
+
+function showProjects() {
+    renderProjects();
+    showView("projects");
+}
+
+function showNotifications() {
+    renderNotifications();
+    showView("notifications");
+}
+
+function renderStudents() {
+    const list = document.getElementById("studentsList");
+    list.innerHTML = "";
+
+    if (students.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak studentów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    students.forEach((student, index) => {
+        const item = document.createElement("div");
+        item.className = "admin-list-item";
+
+        item.innerHTML = `
+            <div class="list-main">
+                <strong>${index + 1}. ${escapeHtml(student.fullName)}</strong>
+                <span>${escapeHtml(student.details)}</span>
+            </div>
+
+            <button class="danger-small" onclick="openDelete('student', ${student.id}, 'students')">Usuń studenta</button>
+        `;
+
+        list.appendChild(item);
+    });
+}
+
+function renderCompanies() {
+    const list = document.getElementById("companiesList");
+    list.innerHTML = "";
+
+    if (companies.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak firm do wyświetlenia.</p></div>";
+        return;
+    }
+
+    companies.forEach((company, index) => {
+        const item = document.createElement("div");
+        item.className = "admin-list-item";
+
+        item.innerHTML = `
+            <div class="list-main">
+                <strong>${index + 1}. ${escapeHtml(company.name)}</strong>
+                <span>${escapeHtml(company.contactEmail)}</span>
+            </div>
+
+            <button class="danger-small" onclick="openDelete('company', ${company.id}, 'companies')">Usuń firmę</button>
+        `;
+
+        list.appendChild(item);
+    });
+}
+
+function renderProjects() {
+    const list = document.getElementById("projectsList");
+    list.innerHTML = "";
+
+    if (projects.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak projektów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    projects.forEach((project, index) => {
+        const card = document.createElement("div");
+        card.className = "admin-project-card";
+
+        card.innerHTML = `
+            <button class="project-card" onclick="showProjectDetails(${project.id})">
+                <div>
+                    <strong>${index + 1}. ${escapeHtml(project.topic)}</strong>
+                    <span>${escapeHtml(project.companyName)}</span>
+                </div>
+                <p>${project.currentGroupsCount || 0}/${project.maxGroups || 0}</p>
+            </button>
+
+            <button class="danger-small" onclick="openDelete('project', ${project.id}, 'projects')">Usuń projekt</button>
+        `;
+
+        list.appendChild(card);
+    });
+}
+
+function renderTeams() {
+    const list = document.getElementById("teamsList");
+    list.innerHTML = "";
+
+    if (teams.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak zespołów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    teams.forEach((team, index) => {
+        const project = projects.find(item => item.id === team.projectId);
+
+        const card = document.createElement("div");
+        card.className = "team-card";
+
+        card.innerHTML = `
+            <div class="team-main" onclick="showTeamDetails(${team.id})">
+                <strong>${index + 1}. ${escapeHtml(team.name)}</strong>
+                <span>${escapeHtml(project?.topic || "Brak projektu")} — ${getTeamStatusText(team.status)}</span>
+            </div>
+
+            <div class="team-actions">
+                <button class="danger" onclick="openDelete('team', ${team.id}, 'teams')">Usuń zespół</button>
+            </div>
+        `;
+
+        list.appendChild(card);
+    });
+}
+
+function renderNotifications() {
+    const list = document.getElementById("allNotifications");
+    list.innerHTML = "";
+
+    if (notifications.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak powiadomień do wyświetlenia.</p>";
+        return;
+    }
+
+    notifications.forEach(notification => {
+        const item = document.createElement("div");
+        item.className = "notification-item";
+        item.innerHTML = `
+            <strong>${escapeHtml(notification.title)}</strong>
+            <p>${escapeHtml(notification.text)}</p>
+            <span class="notification-date">${escapeHtml(notification.date)}</span>
+        `;
+
+        list.appendChild(item);
+    });
+}
+
+function showAddCompany() {
+    document.getElementById("newCompanyName").value = "";
+    document.getElementById("newCompanyLogin").value = "";
+    document.getElementById("newCompanyPassword").value = "";
+    document.getElementById("newCompanyRepeatPassword").value = "";
+    document.getElementById("addCompanyMessage").textContent = "";
+
+    showView("addCompany");
+}
+
+async function addCompany(event) {
+    event.preventDefault();
+
+    const name = document.getElementById("newCompanyName").value.trim();
+    const login = document.getElementById("newCompanyLogin").value.trim();
+    const password = document.getElementById("newCompanyPassword").value.trim();
+    const repeatPassword = document.getElementById("newCompanyRepeatPassword").value.trim();
+    const message = document.getElementById("addCompanyMessage");
+
+    if (!name || !login || !password || !repeatPassword) {
+        message.textContent = "Nie dodano firmy. Uzupełnij wszystkie pola.";
+        message.className = "form-message error";
+        return;
+    }
+
+    if (password !== repeatPassword) {
+        message.textContent = "Nie dodano firmy. Hasła nie są takie same.";
+        message.className = "form-message error";
+        return;
+    }
+
+    const companyExists = companies.some(company => {
+        return company.name.toLowerCase() === name.toLowerCase();
+    });
+
+    if (companyExists) {
+        message.textContent = "Nie dodano firmy. Firma o tej samej nazwie już istnieje.";
+        message.className = "form-message error";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/companies/admin/create-company-account`, {
+            method: "POST",
+            headers: buildHeaders(),
+            body: JSON.stringify({
+                name: name,
+                surname: "Firma",
+                login: login,
+                password: password,
+                passwordConfirm: repeatPassword,
+                companyName: name,
+                contactEmail: null
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || JSON.stringify(result) || "Błąd dodawania firmy.");
+        }
+
+        await loadCompanies();
+
+        notifications.unshift({
+            id: Date.now(),
+            title: "Nowe konto firmy",
+            text: `Administrator dodał nową firmę ${name}.`
+        });
+
+        renderCompanies();
+        renderNotifications();
+
+        event.target.reset();
+        message.textContent = "Firma została dodana.";
+        message.className = "form-message success";
+
+        removeDeleteConfirmFromHistory();
+        showView("companies", false);
+    } catch (error) {
+        message.textContent = error.message || "Błąd dodawania firmy.";
+        message.className = "form-message error";
+    }
+}
+
+function openDelete(type, id, returnView) {
+    deleteData = {
+        type: type,
+        id: id,
+        returnView: returnView
+    };
+
+    const labels = {
+        student: "studenta",
+        team: "zespół",
+        project: "projekt",
+        company: "firmę"
+    };
+
+    const name = getDeleteName(type, id);
+
+    document.getElementById("deleteTitle").textContent = `Usuń ${labels[type]}`;
+    document.getElementById("deleteText").textContent = `Czy chcesz usunąć ${labels[type]} "${name}"?`;
+
+    showView("deleteConfirm");
+}
+
+function getDeleteName(type, id) {
+    if (type === "student") {
+        return students.find(item => item.id === id)?.fullName || "";
+    }
+
+    if (type === "team") {
+        return teams.find(item => item.id === id)?.name || "";
+    }
+
+    if (type === "project") {
+        return projects.find(item => item.id === id)?.topic || "";
+    }
+
+    if (type === "company") {
+        return companies.find(item => item.id === id)?.name || "";
+    }
+
+    return "";
+}
+
+function cancelDelete() {
+    deleteData = {
+        type: null,
+        id: null,
+        returnView: null
+    };
+
+    goBack();
+}
+
+function confirmDelete() {
+    if (deleteData.type === "student") {
+        students = students.filter(student => student.id !== deleteData.id);
+
+        teams.forEach(team => {
+            team.members = team.members.filter(member => member.id !== deleteData.id);
+        });
+
+        renderStudents();
+        renderTeams();
+    }
+
+    if (deleteData.type === "team") {
+        const team = teams.find(item => item.id === deleteData.id);
+
+        if (team && team.status === "accepted") {
+            const project = projects.find(item => item.id === team.projectId);
+
+            if (project && project.currentGroupsCount > 0) {
+                project.currentGroupsCount -= 1;
+            }
+        }
+
+        teams = teams.filter(team => team.id !== deleteData.id);
+
+        renderTeams();
+        renderProjects();
+    }
+
+    if (deleteData.type === "project") {
+        projects = projects.filter(project => project.id !== deleteData.id);
+        teams = teams.filter(team => team.projectId !== deleteData.id);
+        comments = comments.filter(comment => comment.projectId !== deleteData.id);
+
+        renderProjects();
+        renderTeams();
+    }
+
+    if (deleteData.type === "company") {
+        companies = companies.filter(company => company.id !== deleteData.id);
+
+        renderCompanies();
+    }
+
+    const returnView = deleteData.returnView || "dashboard";
+
+    deleteData = {
+        type: null,
+        id: null,
+        returnView: null
+    };
+
+    removeDeleteConfirmFromHistory();
+
+    if (viewHistory[viewHistory.length - 1] === returnView) {
+        viewHistory.pop();
+    }
+
+    showView(returnView, false);
+}
+
+function removeDeleteConfirmFromHistory() {
+    for (let i = viewHistory.length - 1; i >= 0; i--) {
+        if (viewHistory[i] === "deleteConfirm") {
+            viewHistory.splice(i, 1);
+        }
+    }
+}
+
+async function showProjectDetails(projectId) {
+    currentProjectId = projectId;
+    const summary = projects.find(item => item.id === projectId);
+
+    if (!summary) {
+        return;
+    }
+
+    try {
+        currentProjectDetails = await apiGet(`/projects/${projectId}/details`);
+    } catch (error) {
+        console.error("Błąd pobierania szczegółów projektu:", error);
+        currentProjectDetails = null;
+    }
+
+    document.getElementById("projectDetailsTitle").textContent = summary.topic || "";
+    document.getElementById("projectDetailsInfo").textContent =
+        `${summary.companyName || ""} · ${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
+
+    document.getElementById("projectDetailsDescription").textContent = currentProjectDetails?.neededTechnologies || "";
+    document.getElementById("projectDetailsGoal").textContent = currentProjectDetails?.projectGoal || "";
+    document.getElementById("projectDetailsWorkScope").textContent = currentProjectDetails?.workScope || "";
+    document.getElementById("projectDetailsTechResources").textContent = currentProjectDetails?.neededTechnologies || "";
+    document.getElementById("projectDetailsCompany").textContent = currentProjectDetails?.companyName || summary.companyName || "";
+    document.getElementById("projectDetailsTeams").textContent =
+        `${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
+    document.getElementById("projectDetailsPriority").textContent =
+        priorityLabels[currentProjectDetails?.priority] || (currentProjectDetails?.priority ? String(currentProjectDetails.priority) : "");
+
+    showView("projectDetails");
+}
+
+async function showProjectComments() {
+    const list = document.getElementById("projectCommentsList");
+    list.innerHTML = "";
+
+    if (!currentProjectId) {
+        list.innerHTML = "<p class='empty-state'>Wybierz projekt, aby zobaczyć komentarze.</p>";
+        showView("projectComments");
+        return;
+    }
+
+    try {
+        comments = await apiGet(`/comments/project/${currentProjectId}`);
+    } catch (error) {
+        console.error("Błąd pobierania komentarzy:", error);
+        comments = [];
+    }
+
+    if (comments.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
+    } else {
+        comments.forEach(comment => {
+            const item = document.createElement("div");
+            item.className = "comment-item";
+
+            item.innerHTML = `
+                <strong>${escapeHtml(comment.userName || `Użytkownik ${comment.userId}`)}</strong>
+                <p>${escapeHtml(comment.content || comment.comment || "")}</p>
+            `;
+
+            if (comment.responses && comment.responses.length > 0) {
+                const responsesHtml = comment.responses.map(response => `
+                    <div class="comment-response">
+                        <strong>${escapeHtml(response.userName || `Użytkownik ${response.userId}`)}</strong>
+                        <p>${escapeHtml(response.content || "")}</p>
+                    </div>
+                `).join("");
+
+                item.innerHTML += `<div class="comment-responses">${responsesHtml}</div>`;
+            }
+
+            list.appendChild(item);
+        });
+    }
+
+    showView("projectComments");
+}
+
+function showProjectGuidelines() {
+    const summary = projects.find(item => item.id === currentProjectId);
+
+    if (!summary && !currentProjectDetails) {
+        return;
+    }
+
+    const details = currentProjectDetails || {
+        topic: summary?.topic,
+        companyName: summary?.companyName,
+        projectGoal: "",
+        workScope: "",
+        neededTechnologies: "",
+        tags: []
+    };
+
+    document.getElementById("guidelinesTopic").textContent = details.topic || "";
+    document.getElementById("guidelinesCompany").textContent = details.companyName || "";
+    document.getElementById("guidelinesDescription").textContent = details.neededTechnologies || "";
+    document.getElementById("guidelinesGoal").textContent = details.projectGoal || "";
+    document.getElementById("guidelinesWorkScope").textContent = details.workScope || "";
+    document.getElementById("guidelinesTechResources").textContent = details.neededTechnologies || "";
+
+    renderGuidelineTags(details.tags || []);
+
+    showView("projectGuidelines");
+}
+
+function renderGuidelineTags(tags) {
+    const container = document.getElementById("guidelinesTags");
+    container.innerHTML = "";
+
+    if (!tags || tags.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak tagów.</p>";
+        return;
+    }
+
+    tags.forEach(tag => {
+        const span = document.createElement("span");
+        span.textContent = tag;
+        container.appendChild(span);
+    });
+}
+
+function showProjectTeams() {
+    const list = document.getElementById("projectTeamsList");
+    const acceptedTeams = teams.filter(team => {
+        return team.projectId === currentProjectId && team.status === "accepted";
+    });
+
+    list.innerHTML = "";
+
+    if (acceptedTeams.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak zaakceptowanych zespołów dla tego projektu.</p></div>";
+    } else {
+        acceptedTeams.forEach((team, index) => {
+            const card = document.createElement("div");
+            card.className = "team-card";
+
+            card.innerHTML = `
+                <div class="team-main" onclick="showTeamDetails(${team.id})">
+                    <strong>${index + 1}. ${escapeHtml(team.name)}</strong>
+                    <span>Zaakceptowany</span>
+                </div>
+            `;
+
+            list.appendChild(card);
+        });
+    }
+
+    showView("projectTeams");
+}
+
+async function showTeamDetails(teamId) {
+    currentTeamId = teamId;
+
+    const team = teams.find(item => item.id === teamId);
+
+    if (!team) {
+        return;
+    }
+
+    const project = projects.find(item => item.id === team.projectId);
+
+    document.getElementById("teamDetailsName").textContent = team.name || "";
+    document.getElementById("teamDetailsProject").textContent =
+        `Przypisany projekt: ${project?.topic || "Brak projektu"}`;
+
+    const membersList = document.getElementById("teamDetailsMembers");
+    membersList.innerHTML = "";
+
+    let members = team.members || [];
+    if (members.length === 0) {
+        try {
+            const response = await apiGet(`/groups/${teamId}`);
+            members = response.members || [];
+            team.members = members;
+        } catch (error) {
+            console.error("Błąd pobierania członków zespołu:", error);
+        }
+    }
+
+    if (!members || members.length === 0) {
+        membersList.innerHTML = "<p class='empty-state'>Brak członków zespołu do wyświetlenia.</p>";
+    } else {
+        members.forEach(member => {
+            const li = document.createElement("li");
+            li.textContent = member.email || `Student #${member.id}`;
+            membersList.appendChild(li);
+        });
+    }
+
+    const repositoryButton = document.getElementById("repositoryButton");
+
+    if (team.status === "accepted") {
+        repositoryButton.classList.remove("hidden");
+    } else {
+        repositoryButton.classList.add("hidden");
+    }
+
+    showView("teamDetails");
+}
+
+function showRepository() {
+    const team = teams.find(item => item.id === currentTeamId);
+    const project = projects.find(item => item.id === team?.projectId);
+
+    document.getElementById("repositoryDescription").textContent =
+        `${team?.name || "Zespół"} · ${project?.topic || "Projekt"}`;
+
+    renderRepositoryFiles();
+    showView("repository");
+}
+
+function renderRepositoryFiles() {
+    const list = document.getElementById("repositoryFiles");
+    list.innerHTML = "";
+
+    if (repositoryFiles.length === 0) {
+        list.innerHTML = "<li class='empty-state'>Brak plików do wyświetlenia.</li>";
+        return;
+    }
+
+    repositoryFiles.forEach(file => {
+        const li = document.createElement("li");
+        li.textContent = file.name || "";
+        list.appendChild(li);
+    });
+}
+
+function getTeamStatusText(status) {
+    if (status === "accepted") {
+        return "Zaakceptowany";
+    }
+
+    if (status === "rejected") {
+        return "Odrzucony";
+    }
+
+    return "Nie podjęto decyzji";
+}
+
+function formatArray(value) {
+    if (!value || value.length === 0) {
+        return "";
+    }
+
+    return value.join(", ");
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+loadInitialData();
+</script>
+
+</body>
+</html>

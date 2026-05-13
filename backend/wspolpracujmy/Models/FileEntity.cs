@@ -1,10 +1,14 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Newtonsoft.Json;
 
 namespace wspolpracujmy.Models
 {
     [Table("Files")]
+    /// <summary>
+    /// Reprezentuje plik przechowywany w systemie (metadane pliku).
+    /// </summary>
     public class FileEntity
     {
         [Key]
@@ -14,6 +18,9 @@ namespace wspolpracujmy.Models
         [Required]
         [Column("user_id")]
         public int UserId { get; set; }
+
+        [Column("group_id")]
+        public int? GroupId { get; set; }
 
         [Required]
         [Column("original_name")]
@@ -39,6 +46,7 @@ namespace wspolpracujmy.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
-        public required User User { get; set; }
+        [JsonIgnore]
+        public User? User { get; set; }
     }
 }

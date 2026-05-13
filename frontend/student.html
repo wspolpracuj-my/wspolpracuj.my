@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel studenta - wspolpracuj.my</title>
+    <link rel="stylesheet" href="student.css">
+</head>
+<body>
+
+<div class="app">
+    <main class="content">
+
+        <header class="topbar">
+            <div class="brand">
+                <h2 class="logo">wspolpracuj.my</h2>
+                <p class="account-type">Panel studenta</p>
+            </div>
+
+            <button class="logout-btn" onclick="logout()">Wyloguj</button>
+        </header>
+
+        <section id="dashboard" class="view active-view">
+            <div class="student-start-box">
+                <h1>Cześć<span id="studentName"></span></h1>
+
+                <button onclick="showTeamEntry()">ZESPÓŁ</button>
+                <button onclick="showNotifications()">POWIADOMIENIA</button>
+            </div>
+        </section>
+
+        <section id="notifications" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Powiadomienia</h2>
+                    <p class="muted">Powiadomienia dotyczą wyłącznie zespołu studenta.</p>
+                </div>
+            </div>
+
+            <div id="allNotifications" class="notification-list card"></div>
+        </section>
+
+        <section id="teamChoice" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="student-start-box wider-box">
+                <h2>Zespół</h2>
+                <p class="muted center-text">
+                    Nie należysz jeszcze do zespołu. Możesz stworzyć własny zespół albo dołączyć do zespołu, do którego zostałeś zaproszony.
+                </p>
+
+                <button onclick="showCreateTeam()">STWÓRZ ZESPÓŁ</button>
+                <button onclick="showJoinTeam()">DOŁĄCZ DO ZESPOŁU</button>
+            </div>
+        </section>
+
+        <section id="createTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Stwórz zespół</h2>
+                    <p class="muted">Tworzący zespół automatycznie otrzymuje rolę lidera.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="createTeam(event)">
+                <label>
+                    Nazwa zespołu
+                    <input id="newTeamName" type="text">
+                </label>
+
+                <label>
+                    Liczba członków zespołu
+                    <input id="newTeamSize" type="number" min="1">
+                </label>
+
+                <button type="submit">Stwórz</button>
+                <p id="createTeamMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="joinTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Dołącz do zespołu</h2>
+                    <p class="muted">Lista zespołów, do których student został zaproszony.</p>
+                </div>
+            </div>
+
+            <div id="invitedTeamsList" class="team-list scroll-list"></div>
+        </section>
+
+        <section id="teamProjectMenu" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="student-start-box wider-box">
+                <h2>Twój zespół / Twój projekt</h2>
+
+                <button onclick="showMyTeam()">TWÓJ ZESPÓŁ</button>
+                <button onclick="showStudentProject()">TWÓJ PROJEKT</button>
+            </div>
+        </section>
+
+        <section id="myTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Twój zespół</p>
+                    <h2 id="myTeamName"></h2>
+                    <p id="myTeamRole" class="muted"></p>
+                </div>
+
+                <button id="editTeamButton" class="small-primary hidden" onclick="showEditTeam()">Edytuj</button>
+            </div>
+
+            <div id="teamMembersList" class="card member-list"></div>
+        </section>
+
+        <section id="inviteStudent" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Zaproś studenta</h2>
+                    <p class="muted">Podaj mail studencki osoby, którą chcesz zaprosić do zespołu.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="inviteStudent(event)">
+                <label>
+                    Mail studencki
+                    <input id="inviteEmail" type="email">
+                </label>
+
+                <button type="submit">Zaproś</button>
+                <p id="inviteMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="removeStudent" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Usuń studenta</h2>
+                    <p id="removeStudentText" class="muted"></p>
+                </div>
+            </div>
+
+            <div class="card confirm-card">
+                <button class="danger-main" onclick="confirmRemoveStudent()">Usuń</button>
+            </div>
+        </section>
+
+        <section id="editTeam" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row centered-title">
+                <div>
+                    <h2>Edytuj zespół</h2>
+                    <p class="muted">Można edytować tylko liczbę członków zespołu. Nazwa zespołu pozostaje bez zmian.</p>
+                </div>
+            </div>
+
+            <form class="card project-form" onsubmit="confirmEditTeam(event)">
+                <label>
+                    Nazwa zespołu
+                    <input id="editTeamName" type="text" disabled>
+                </label>
+
+                <label>
+                    Liczba członków zespołu
+                    <input id="editTeamSize" type="number" min="1">
+                </label>
+
+                <button type="submit">Edytuj</button>
+                <p id="editTeamMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="studentProject" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Twój projekt</h2>
+                    <p id="studentProjectDescription" class="muted"></p>
+                </div>
+            </div>
+
+            <div id="studentProjectContent"></div>
+        </section>
+
+        <section id="availableProjects" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Dostępne projekty</h2>
+                    <p class="muted">Lista projektów od najnowszych.</p>
+                </div>
+            </div>
+
+            <div id="availableProjectsList" class="project-list scroll-list"></div>
+        </section>
+
+        <section id="selectedProject" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Wybrany projekt</p>
+                    <h2 id="selectedProjectTitle"></h2>
+                    <p id="selectedProjectCompany" class="muted"></p>
+                </div>
+            </div>
+
+            <div id="selectedProjectActions" class="quick-actions"></div>
+
+            <div class="card details-card">
+                <h3>Status zgłoszenia</h3>
+                <p id="selectedProjectStatus" class="status-text"></p>
+
+                <h3>Opis</h3>
+                <p id="selectedProjectDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="selectedProjectGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="selectedProjectWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="selectedProjectTechResources"></p>
+            </div>
+        </section>
+
+        <section id="projectComments" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Komentarze</h2>
+                    <p class="muted">Zespół widzi swoje komentarze oraz odpowiedzi firmy.</p>
+                </div>
+            </div>
+
+            <div class="card project-form">
+                <label>
+                    Nowy komentarz
+                    <textarea id="newCommentText"></textarea>
+                </label>
+
+                <button onclick="addComment()">Dodaj komentarz</button>
+                <p id="commentMessage" class="form-message"></p>
+            </div>
+
+            <div id="projectCommentsList" class="card comment-list comments-margin"></div>
+        </section>
+
+        <section id="projectGuidelines" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Wytyczne</h2>
+                    <p class="muted">Dane projektu wypełnione przez firmę. Widok tylko do odczytu.</p>
+                </div>
+            </div>
+
+            <div class="card details-card">
+                <h3>Temat</h3>
+                <p id="guidelinesTopic"></p>
+
+                <h3>Zleceniodawca</h3>
+                <p id="guidelinesCompany"></p>
+
+                <h3>Opis</h3>
+                <p id="guidelinesDescription"></p>
+
+                <h3>Cel projektu</h3>
+                <p id="guidelinesGoal"></p>
+
+                <h3>Zakres pracy</h3>
+                <p id="guidelinesWorkScope"></p>
+
+                <h3>Wymagane zasoby technologiczne</h3>
+                <p id="guidelinesTechResources"></p>
+
+                <h3>Tagi</h3>
+                <div id="guidelinesTags" class="selected-tags"></div>
+            </div>
+        </section>
+
+        <section id="repository" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <p class="small-label">Repozytorium</p>
+                    <h2>Pliki</h2>
+                    <p class="muted">Miejsce na wrzucanie plików związanych z projektem.</p>
+                </div>
+            </div>
+
+            <div class="card repository-box">
+                <h3>Pliki</h3>
+
+                <div class="upload-area">
+                    <p>Wybierz pliki z dysku.</p>
+                    <input type="file" multiple>
+                </div>
+
+                <ul id="repositoryFiles" class="file-list"></ul>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+const API_URL = "http://localhost:5000/api";
+
+let studentData = {
+    id: null,
+    fullName: "",
+    email: "",
+    teamId: null
+};
+
+let currentTeam = null;
+let currentProjectId = null;
+let currentStudentToRemoveId = null;
+
+const viewHistory = [];
+
+let notifications = [];
+let invitedTeams = [];
+let availableProjects = [];
+let projectComments = [];
+let repositoryFiles = [];
+
+const applicationStatuses = {
+    none: "Brak zgłoszenia",
+    pending: "Oczekujący",
+    rejected: "Odrzucony",
+    accepted: "Zaakceptowany"
+};
+
+// Helper to get auth token
+function getAuthToken() {
+    return localStorage.getItem('jwt_token') || '';
+}
+
+// Helper to make API requests
+async function apiRequest(endpoint, method = 'GET', body = null) {
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+        }
+    };
+
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+
+    try {
+        const response = await fetch(`${API_URL}${endpoint}`, options);
+        if (!response.ok) {
+            if (response.status === 401) {
+                // Unauthorized - redirect to login
+                window.location.href = 'index.html';
+                return null;
+            }
+            const error = await response.json();
+            throw new Error(error.message || `HTTP ${response.status}`);
+        }
+        
+        if (response.status === 204) {
+            return null; // No content
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+    }
+}
+
+async function loadInitialData() {
+    try {
+        // Get current user (from localStorage since we're on student page)
+        const currentUserId = localStorage.getItem('user_id');
+        if (!currentUserId) {
+            System.out.println('No user ID found in localStorage, redirecting to login');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // Fetch current student
+        const student = await apiRequest(`/students/${currentUserId}`);
+        if (student) {
+            studentData = {
+                id: student.id,
+                fullName: `${student.user?.name || ''} ${student.user?.surname || ''}`.trim(),
+                email: student.email,
+                teamId: student.groupId
+            };
+
+            // Fetch student's group if they have one
+            if (student.groupId) {
+                const group = await apiRequest(`/groups/${student.groupId}`);
+                if (group) {
+                    currentTeam = {
+                        id: group.id,
+                        name: group.name,
+                        projectId: group.projectId,
+                        applicationStatus: group.isAccepted ? (group.projectId ? 'accepted' : 'pending') : 'none',
+                        leaderId: group.leaderId,
+                        members: group.members?.map(m => ({
+                            id: m.id,
+                            fullName: `${m.user?.name || ''} ${m.user?.surname || ''}`.trim(),
+                            email: m.email,
+                            role: m.id === group.leaderId ? 'leader' : 'member'
+                        })) || []
+                    };
+                }
+            }
+
+            setStudentData(studentData);
+        }
+
+        // Fetch notifications
+        const notif = await apiRequest('/notifications');
+        if (notif) {
+            notifications = Array.isArray(notif) ? notif : [];
+        }
+
+        // Fetch available projects
+        const projects = await apiRequest('/projects');
+        if (projects) {
+            availableProjects = Array.isArray(projects) ? projects.map(p => ({
+                id: p.id,
+                topic: p.topic,
+                companyName: p.company?.name,
+                description: p.description,
+                goal: p.projectGoal,
+                workScope: p.workScope,
+                techResources: p.neededTechnologies,
+                teamSlots: p.maxGroups,
+                acceptedTeams: 0, // TODO: calculate from database
+                tags: p.tags ? p.tags.map(t => t.name) : []
+            })) : [];
+        }
+
+        renderNotifications();
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+    }
+}
+
+async function saveTeamToBackend(teamData) {
+    try {
+        const groupData = {
+            name: teamData.name,
+            projectId: 0,
+            isAccepted: false,
+            leaderId: studentData.id
+        };
+
+        const created = await apiRequest('/groups', 'POST', groupData);
+        
+        // Add current student to the group
+        if (created && studentData.id) {
+            await apiRequest(`/students/${studentData.id}/group`, 'PATCH', {
+                groupId: created.id
+            });
+        }
+
+        return {
+            ...teamData,
+            id: created?.id,
+            leaderId: studentData.id
+        };
+    } catch (error) {
+        console.error('Error saving team:', error);
+        throw error;
+    }
+}
+
+async function joinTeamInBackend(teamId) {
+    try {
+        await apiRequest(`/students/${studentData.id}/group`, 'PATCH', {
+            groupId: teamId
+        });
+        return true;
+    } catch (error) {
+        console.error('Error joining team:', error);
+        throw error;
+    }
+}
+
+async function updateTeamInBackend(teamData) {
+    try {
+        const updateData = {
+            name: teamData.name,
+            projectId: teamData.projectId || 0,
+            isAccepted: teamData.applicationStatus === 'accepted'
+        };
+
+        await apiRequest(`/groups/${teamData.id}`, 'PUT', updateData);
+        return true;
+    } catch (error) {
+        console.error('Error updating team:', error);
+        throw error;
+    }
+}
+
+async function inviteStudentToBackend(email) {
+    try {
+        // Find student by email and add to group
+        const students = await apiRequest('/students');
+        const student = students?.find(s => s.email === email);
+        
+        if (!student) {
+            throw new Error('Student nie znaleziony');
+        }
+
+        await apiRequest(`/students/${student.id}/group`, 'PATCH', {
+            groupId: currentTeam.id
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('Error inviting student:', error);
+        throw error;
+    }
+}
+
+async function removeStudentFromBackend(studentId) {
+    try {
+        // Remove student from group by setting groupId to null
+        await apiRequest(`/students/${studentId}/group`, 'PATCH', {
+            groupId: null
+        });
+        return true;
+    } catch (error) {
+        console.error('Error removing student:', error);
+        throw error;
+    }
+}
+
+async function applyTeamToProjectInBackend(projectId) {
+    try {
+        if (!currentTeam) return false;
+        
+        const updateData = {
+            name: currentTeam.name,
+            projectId: projectId,
+            isAccepted: false
+        };
+
+        await apiRequest(`/groups/${currentTeam.id}`, 'PUT', updateData);
+        return true;
+    } catch (error) {
+        console.error('Error applying to project:', error);
+        throw error;
+    }
+}
+
+async function saveCommentToBackend(commentData) {
+    try {
+        const payload = {
+            text: commentData.text,
+            projectId: currentProjectId,
+            authorId: studentData.id
+        };
+
+        const created = await apiRequest('/comments', 'POST', payload);
+        
+        return {
+            ...commentData,
+            id: created?.id
+        };
+    } catch (error) {
+        console.error('Error saving comment:', error);
+        throw error;
+    }
+}
+
+function setStudentData(data) {
+    studentData = data || {
+        id: null,
+        fullName: "",
+        email: "",
+        teamId: null
+    };
+
+    const studentNameElement = document.getElementById("studentName");
+
+    if (studentData.fullName) {
+        studentNameElement.textContent = `, ${studentData.fullName}`;
+    } else {
+        studentNameElement.textContent = "";
+    }
+}
+
+function showView(viewId, saveHistory = true) {
+    const currentView = document.querySelector(".active-view");
+
+    if (currentView && saveHistory && currentView.id !== viewId) {
+        viewHistory.push(currentView.id);
+    }
+
+    document.querySelectorAll(".view").forEach(view => {
+        view.classList.remove("active-view");
+    });
+
+    document.getElementById(viewId).classList.add("active-view");
+}
+
+function goBack() {
+    const previousView = viewHistory.pop();
+
+    if (previousView) {
+        showView(previousView, false);
+    } else {
+        showView("dashboard", false);
+    }
+}
+
+function logout() {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_id');
+    window.location.href = 'index.html';
+}
+
+function showTeamEntry() {
+    if (currentTeam) {
+        showView("teamProjectMenu");
+    } else {
+        showView("teamChoice");
+    }
+}
+
+function showNotifications() {
+    renderNotifications();
+    showView("notifications");
+}
+
+function renderNotifications() {
+    const allNotifications = document.getElementById("allNotifications");
+
+    allNotifications.innerHTML = "";
+
+    if (!currentTeam || notifications.length === 0) {
+        allNotifications.innerHTML = "<p class='empty-state'>Brak powiadomień do wyświetlenia.</p>";
+        return;
+    }
+
+    notifications.forEach(notification => {
+        allNotifications.appendChild(createNotification(notification));
+    });
+}
+
+function createNotification(notification) {
+    const item = document.createElement("div");
+    item.className = "notification-item";
+    item.textContent = notification.text || "";
+    return item;
+}
+
+function showCreateTeam() {
+    document.getElementById("createTeamMessage").textContent = "";
+    showView("createTeam");
+}
+
+async function createTeam(event) {
+    event.preventDefault();
+
+    const name = document.getElementById("newTeamName").value.trim();
+    const size = Number(document.getElementById("newTeamSize").value);
+    const message = document.getElementById("createTeamMessage");
+
+    if (!name || !size || size < 1) {
+        message.textContent = "Niepomyślnie stworzono zespół. Uzupełnij poprawnie wszystkie pola.";
+        message.className = "form-message error";
+        return;
+    }
+
+    try {
+        const teamData = {
+            name: name,
+            projectId: 0,
+            isAccepted: false,
+            leaderId: studentData.id
+        };
+
+        const createdTeam = await apiRequest('/groups', 'POST', teamData);
+        
+        if (!createdTeam) {
+            throw new Error('Failed to create team');
+        }
+
+        // Add student to the newly created group
+        await apiRequest(`/students/${studentData.id}/group`, 'PATCH', {
+            groupId: createdTeam.id
+        });
+
+        currentTeam = {
+            id: createdTeam.id,
+            name: createdTeam.name,
+            projectId: createdTeam.projectId,
+            applicationStatus: createdTeam.isAccepted ? 'accepted' : 'none',
+            leaderId: createdTeam.leaderId,
+            members: [{
+                id: studentData.id,
+                fullName: studentData.fullName,
+                email: studentData.email,
+                role: "leader"
+            }]
+        };
+
+        studentData.teamId = createdTeam.id;
+
+        event.target.reset();
+        message.textContent = "Zespół został pomyślnie utworzony!";
+        message.className = "form-message success";
+        
+        setTimeout(() => {
+            showView("dashboard");
+        }, 1000);
+    } catch (error) {
+        message.textContent = `Nie udało się utworzyć zespół: ${error.message}`;
+        message.className = "form-message error";
+    }
+}
+
+function showJoinTeam() {
+    loadInvitedTeams();
+    showView("joinTeam");
+}
+
+async function loadInvitedTeams() {
+    try {
+        // Fetch all groups
+        const groups = await apiRequest('/groups');
+        if (!groups) return;
+
+        // Filter groups where student is not already a member
+        invitedTeams = groups.filter(group => {
+            // Check if student is not in this group
+            return !group.members?.some(m => m.id === studentData.id);
+        });
+
+        renderInvitedTeams();
+    } catch (error) {
+        console.error('Error loading invited teams:', error);
+        renderInvitedTeams();
+    }
+}
+
+function renderInvitedTeams() {
+    const list = document.getElementById("invitedTeamsList");
+    list.innerHTML = "";
+
+    if (invitedTeams.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak zaproszeń do zespołów.</p></div>";
+        return;
+    }
+
+    invitedTeams.forEach(team => {
+        const card = document.createElement("div");
+        card.className = "team-card";
+
+        card.innerHTML = `
+            <div class="team-main">
+                <strong>${escapeHtml(team.name || "")}</strong>
+                <span>Liczba miejsc: ${team.members?.length || 0}/${team.size || 0}</span>
+            </div>
+
+            <div class="team-actions">
+                <button onclick="joinTeam(${team.id})">Dołącz do zespołu</button>
+            </div>
+        `;
+
+        list.appendChild(card);
+    });
+}
+
+async function joinTeam(teamId) {
+    if (currentTeam) {
+        return;
+    }
+
+    try {
+        await joinTeamInBackend(teamId);
+
+        const team = invitedTeams.find(item => item.id === teamId);
+
+        if (!team) {
+            throw new Error('Team not found');
+        }
+
+        currentTeam = {
+            id: team.id,
+            name: team.name,
+            projectId: team.projectId,
+            applicationStatus: team.isAccepted ? 'accepted' : 'none',
+            leaderId: team.leaderId,
+            members: [
+                ...(team.members || []).map(m => ({
+                    id: m.id,
+                    fullName: m.fullName || `${m.user?.name || ''} ${m.user?.surname || ''}`.trim(),
+                    email: m.email,
+                    role: m.id === team.leaderId ? 'leader' : 'member'
+                })),
+                {
+                    id: studentData.id,
+                    fullName: studentData.fullName,
+                    email: studentData.email,
+                    role: "member"
+                }
+            ]
+        };
+
+        studentData.teamId = currentTeam.id;
+
+        showView("dashboard");
+    } catch (error) {
+        console.error('Error joining team:', error);
+        alert(`Nie udało się dołączyć do zespołu: ${error.message}`);
+    }
+}
+
+function showMyTeam() {
+    if (!currentTeam) {
+        showTeamEntry();
+        return;
+    }
+
+    const isLeader = isCurrentStudentLeader();
+
+    document.getElementById("myTeamName").textContent = currentTeam.name || "";
+    document.getElementById("myTeamRole").textContent = isLeader ? "Twoja rola: lider zespołu" : "Twoja rola: członek zespołu";
+
+    const editButton = document.getElementById("editTeamButton");
+
+    if (isLeader) {
+        editButton.classList.remove("hidden");
+    } else {
+        editButton.classList.add("hidden");
+    }
+
+    renderTeamMembers();
+    showView("myTeam");
+}
+
+function renderTeamMembers() {
+    const container = document.getElementById("teamMembersList");
+    const isLeader = isCurrentStudentLeader();
+
+    container.innerHTML = "";
+
+    if (!currentTeam || !currentTeam.members || currentTeam.members.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak członków zespołu do wyświetlenia.</p>";
+        return;
+    }
+
+    const membersToDisplay = isLeader ? currentTeam.size : currentTeam.members.length;
+
+    for (let i = 0; i < membersToDisplay; i++) {
+        const member = currentTeam.members[i];
+
+        const row = document.createElement("div");
+        row.className = "member-row";
+
+        if (member) {
+            const crown = member.role === "leader" ? " 👑" : "";
+
+            row.innerHTML = `
+                <div>
+                    <strong>${i + 1}. ${escapeHtml(member.fullName || "")}${crown}</strong>
+                    <span>${escapeHtml(member.email || "")}</span>
+                </div>
+            `;
+
+            if (isLeader && member.role !== "leader") {
+                const removeButton = document.createElement("button");
+                removeButton.textContent = "Usuń";
+                removeButton.className = "danger-small";
+                removeButton.onclick = () => showRemoveStudent(member.id);
+
+                row.appendChild(removeButton);
+            }
+        } else {
+            row.innerHTML = `
+                <div>
+                    <strong>${i + 1}. Puste miejsce</strong>
+                    <span>Możesz zaprosić studenta.</span>
+                </div>
+            `;
+
+            if (isLeader) {
+                const inviteButton = document.createElement("button");
+                inviteButton.textContent = "Zaproś";
+                inviteButton.className = "small-primary";
+                inviteButton.onclick = showInviteStudent;
+
+                row.appendChild(inviteButton);
+            }
+        }
+
+        container.appendChild(row);
+    }
+}
+
+function showInviteStudent() {
+    document.getElementById("inviteEmail").value = "";
+    document.getElementById("inviteMessage").textContent = "";
+    showView("inviteStudent");
+}
+
+async function inviteStudent(event) {
+    event.preventDefault();
+
+    const email = document.getElementById("inviteEmail").value.trim();
+    const message = document.getElementById("inviteMessage");
+
+    if (!isValidEmail(email)) {
+        message.textContent = "Nie zaproszono studenta. Podaj poprawny mail studencki.";
+        message.className = "form-message error";
+        return;
+    }
+
+    try {
+        await inviteStudentToBackend(email);
+
+        message.textContent = "Zaproszono studenta.";
+        message.className = "form-message success";
+
+        document.getElementById("inviteEmail").value = "";
+        
+        setTimeout(() => {
+            goBack();
+        }, 1500);
+    } catch (error) {
+        message.textContent = `Nie udało się zaprosić studenta: ${error.message}`;
+        message.className = "form-message error";
+    }
+}
+
+function showRemoveStudent(studentId) {
+    currentStudentToRemoveId = studentId;
+
+    const student = currentTeam.members.find(member => member.id === studentId);
+
+    if (!student) {
+        return;
+    }
+
+    document.getElementById("removeStudentText").textContent =
+        `Czy chcesz usunąć studenta ${student.fullName} z zespołu ${currentTeam.name}?`;
+
+    showView("removeStudent");
+}
+
+async function confirmRemoveStudent() {
+    if (!currentStudentToRemoveId || !currentTeam) {
+        return;
+    }
+
+    try {
+        await removeStudentFromBackend(currentStudentToRemoveId);
+
+        currentTeam.members = currentTeam.members.filter(member => member.id !== currentStudentToRemoveId);
+        currentStudentToRemoveId = null;
+
+        showMyTeam();
+    } catch (error) {
+        console.error('Error removing student:', error);
+        alert(`Nie udało się usunąć studenta: ${error.message}`);
+    }
+}
+
+function showEditTeam() {
+    if (!currentTeam || !isCurrentStudentLeader()) {
+        return;
+    }
+
+    document.getElementById("editTeamName").value = currentTeam.name || "";
+    document.getElementById("editTeamSize").value = currentTeam.size || "";
+    document.getElementById("editTeamMessage").textContent = "";
+
+    showView("editTeam");
+}
+
+async function confirmEditTeam(event) {
+    event.preventDefault();
+
+    const size = Number(document.getElementById("editTeamSize").value);
+    const message = document.getElementById("editTeamMessage");
+
+    if (!size || size < currentTeam.members.length) {
+        message.textContent = "Nie zedytowano liczby członków zespołu. Liczba nie może być mniejsza niż obecna liczba członków.";
+        message.className = "form-message error";
+        return;
+    }
+
+    try {
+        currentTeam.size = size;
+
+        await updateTeamInBackend(currentTeam);
+
+        message.textContent = "Zespół został zaktualizowany.";
+        message.className = "form-message success";
+        
+        setTimeout(() => {
+            showMyTeam();
+        }, 1000);
+    } catch (error) {
+        message.textContent = `Nie udało się edytować zespół: ${error.message}`;
+        message.className = "form-message error";
+    }
+}
+
+function showStudentProject() {
+    const container = document.getElementById("studentProjectContent");
+    const description = document.getElementById("studentProjectDescription");
+
+    container.innerHTML = "";
+
+    if (!currentTeam) {
+        description.textContent = "Nie należysz jeszcze do zespołu, więc nie możesz zgłosić się do projektu.";
+        container.innerHTML = "<div class='card'><p class='empty-state'>Najpierw stwórz zespół albo dołącz do istniejącego zespołu.</p></div>";
+        showView("studentProject");
+        return;
+    }
+
+    if (currentTeam.projectId && currentTeam.applicationStatus === "accepted") {
+        const project = availableProjects.find(item => item.id === currentTeam.projectId);
+
+        description.textContent = "Twój zespół ma zaakceptowany projekt.";
+
+        container.innerHTML = `
+            <div class="card">
+                <h3>${escapeHtml(project?.topic || "")}</h3>
+                <p class="muted">${escapeHtml(project?.companyName || "")}</p>
+
+                <div class="quick-actions inside-card-actions">
+                    <button onclick="showProjectComments()">Komentarze</button>
+                    <button onclick="showProjectGuidelines(${currentTeam.projectId})">Wytyczne</button>
+                    <button onclick="showRepository()">Repozytorium</button>
+                </div>
+            </div>
+        `;
+
+        showView("studentProject");
+        return;
+    }
+
+    description.textContent = "Twój zespół nie ma jeszcze zaakceptowanego projektu.";
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+        <p class="muted">Możesz przejrzeć dostępne projekty i zgłosić zespół do wybranego projektu.</p>
+        <div class="quick-actions inside-card-actions">
+            <button onclick="showAvailableProjects()">Wybierz projekt</button>
+        </div>
+    `;
+
+    container.appendChild(card);
+    showView("studentProject");
+}
+
+function showAvailableProjects() {
+    renderAvailableProjects();
+    showView("availableProjects");
+}
+
+function renderAvailableProjects() {
+    const list = document.getElementById("availableProjectsList");
+    list.innerHTML = "";
+
+    if (availableProjects.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak projektów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    availableProjects.forEach(project => {
+        list.appendChild(createProjectCard(project));
+    });
+}
+
+function createProjectCard(project) {
+    const card = document.createElement("button");
+    card.className = "project-card";
+    card.onclick = () => showSelectedProject(project.id);
+
+    const acceptedTeams = project.acceptedTeams || 0;
+    const teamSlots = project.teamSlots || 0;
+
+    card.innerHTML = `
+        <div>
+            <strong>${escapeHtml(project.topic || "")}</strong>
+            <span>${escapeHtml(project.companyName || "")}</span>
+        </div>
+        <p>${acceptedTeams}/${teamSlots}</p>
+    `;
+
+    return card;
+}
+
+function showSelectedProject(projectId) {
+    currentProjectId = projectId;
+
+    const project = availableProjects.find(item => item.id === projectId);
+
+    if (!project) {
+        return;
+    }
+
+    const status = getProjectApplicationStatus(projectId);
+
+    document.getElementById("selectedProjectTitle").textContent = project.topic || "";
+    document.getElementById("selectedProjectCompany").textContent = project.companyName || "";
+    document.getElementById("selectedProjectStatus").textContent = applicationStatuses[status] || applicationStatuses.none;
+    document.getElementById("selectedProjectDescription").textContent = project.description || "";
+    document.getElementById("selectedProjectGoal").textContent = project.goal || "";
+    document.getElementById("selectedProjectWorkScope").textContent = project.workScope || "";
+    document.getElementById("selectedProjectTechResources").textContent = project.techResources || "";
+
+    renderSelectedProjectActions(project, status);
+
+    showView("selectedProject");
+}
+
+function renderSelectedProjectActions(project, status) {
+    const actions = document.getElementById("selectedProjectActions");
+    actions.innerHTML = "";
+
+    const commentsButton = document.createElement("button");
+    commentsButton.textContent = "Komentarze";
+    commentsButton.onclick = showProjectComments;
+
+    const guidelinesButton = document.createElement("button");
+    guidelinesButton.textContent = "Wytyczne";
+    guidelinesButton.onclick = () => showProjectGuidelines(project.id);
+
+    actions.appendChild(commentsButton);
+    actions.appendChild(guidelinesButton);
+
+    const projectFull = (project.acceptedTeams || 0) >= (project.teamSlots || 0);
+
+    if (isCurrentStudentLeader() && status !== "pending" && status !== "accepted" && !projectFull) {
+        const applyButton = document.createElement("button");
+        applyButton.textContent = "Zgłoś zespół";
+        applyButton.onclick = () => applyTeamToProject(project.id);
+
+        actions.prepend(applyButton);
+    }
+}
+
+async function applyTeamToProject(projectId) {
+    if (!currentTeam || !isCurrentStudentLeader()) {
+        return;
+    }
+
+    try {
+        await applyTeamToProjectInBackend(projectId);
+
+        currentTeam.projectId = projectId;
+        currentTeam.applicationStatus = "pending";
+
+        showSelectedProject(projectId);
+    } catch (error) {
+        console.error('Error applying to project:', error);
+        alert(`Nie udało się złożyć zgłoszenie: ${error.message}`);
+    }
+}
+
+function getProjectApplicationStatus(projectId) {
+    if (!currentTeam || currentTeam.projectId !== projectId) {
+        return "none";
+    }
+
+    return currentTeam.applicationStatus || "none";
+}
+
+function showProjectComments() {
+    const list = document.getElementById("projectCommentsList");
+    const commentMessage = document.getElementById("commentMessage");
+
+    commentMessage.textContent = "";
+    list.innerHTML = "";
+
+    const commentsForProject = projectComments.filter(comment => {
+        return comment.projectId === currentProjectId && comment.teamId === currentTeam?.id;
+    });
+
+    if (commentsForProject.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
+    } else {
+        commentsForProject.forEach(comment => {
+            const item = document.createElement("div");
+            item.className = "comment-item";
+            item.innerHTML = `
+                <strong>${escapeHtml(comment.authorName || "")}</strong>
+                <p>${escapeHtml(comment.text || "")}</p>
+            `;
+
+            list.appendChild(item);
+        });
+    }
+
+    showView("projectComments");
+}
+
+async function addComment() {
+    const text = document.getElementById("newCommentText").value.trim();
+    const message = document.getElementById("commentMessage");
+
+    if (!text) {
+        message.textContent = "Komentarz nie może być pusty.";
+        message.className = "form-message error";
+        return;
+    }
+
+    try {
+        const commentData = {
+            text: text,
+            projectId: currentProjectId,
+            authorId: studentData.id
+        };
+
+        const savedComment = await saveCommentToBackend(commentData);
+
+        if (savedComment) {
+            projectComments.unshift({
+                id: savedComment.id,
+                projectId: currentProjectId,
+                teamId: currentTeam?.id,
+                authorName: currentTeam?.name || "",
+                text: text
+            });
+        }
+
+        document.getElementById("newCommentText").value = "";
+        message.textContent = "Komentarz został dodany.";
+        message.className = "form-message success";
+        
+        showProjectComments();
+    } catch (error) {
+        message.textContent = `Nie udało się dodać komentarz: ${error.message}`;
+        message.className = "form-message error";
+    }
+}
+
+function showProjectGuidelines(projectId = currentProjectId) {
+    const project = availableProjects.find(item => item.id === projectId);
+
+    if (!project) {
+        return;
+    }
+
+    document.getElementById("guidelinesTopic").textContent = project.topic || "";
+    document.getElementById("guidelinesCompany").textContent = project.companyName || "";
+    document.getElementById("guidelinesDescription").textContent = project.description || "";
+    document.getElementById("guidelinesGoal").textContent = project.goal || "";
+    document.getElementById("guidelinesWorkScope").textContent = project.workScope || "";
+    document.getElementById("guidelinesTechResources").textContent = project.techResources || "";
+
+    renderGuidelineTags(project.tags || []);
+
+    showView("projectGuidelines");
+}
+
+function renderGuidelineTags(tags) {
+    const container = document.getElementById("guidelinesTags");
+    container.innerHTML = "";
+
+    if (!tags || tags.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak tagów.</p>";
+        return;
+    }
+
+    tags.forEach(tag => {
+        const span = document.createElement("span");
+        span.textContent = tag;
+        container.appendChild(span);
+    });
+}
+
+function showRepository() {
+    renderRepositoryFiles();
+    showView("repository");
+}
+
+function renderRepositoryFiles() {
+    const fileList = document.getElementById("repositoryFiles");
+
+    fileList.innerHTML = "";
+
+    if (repositoryFiles.length === 0) {
+        fileList.innerHTML = "<li class='empty-state'>Brak plików do wyświetlenia.</li>";
+        return;
+    }
+
+    repositoryFiles.forEach(file => {
+        const li = document.createElement("li");
+        li.textContent = file.name || "";
+        fileList.appendChild(li);
+    });
+}
+
+function isCurrentStudentLeader() {
+    if (!currentTeam || !currentTeam.members) {
+        return false;
+    }
+
+    const currentMember = currentTeam.members.find(member => member.id === studentData.id);
+
+    return currentMember?.role === "leader";
+}
+
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+loadInitialData();
+</script>
+
+</body>
+</html>

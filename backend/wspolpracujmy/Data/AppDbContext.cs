@@ -6,6 +6,19 @@ namespace wspolpracujmy.Data
 {
     public class AppDbContext : DbContext
     {
+        private static GroupStatus ParseGroupStatus(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return GroupStatus.Pending;
+            try
+            {
+                return (GroupStatus)Enum.Parse(typeof(GroupStatus), v, true);
+            }
+            catch
+            {
+                return GroupStatus.Pending;
+            }
+        }
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         public DbSet<User> Users { get; set; }
@@ -42,6 +55,16 @@ namespace wspolpracujmy.Data
             modelBuilder.Entity<CalendarEvent>().ToTable("CalendarEvents");
             modelBuilder.Entity<MeetingType>().ToTable("Meeting_types");
             modelBuilder.Entity<GroupRequest>().ToTable("GroupRequests");
+
+            // Store GroupRequest.Status enum as string in the database
+            // When reading from the DB, tolerate unexpected string values by falling
+            // back to GroupStatus.Pending instead of throwing an exception.
+            modelBuilder.Entity<GroupRequest>()
+                .Property(gr => gr.Status)
+                .HasConversion(
+                    v => v.ToString(),
+                    v => ParseGroupStatus(v)
+                );
 
             // Composite keys
             modelBuilder.Entity<ProjectTag>()
@@ -89,19 +112,43 @@ namespace wspolpracujmy.Data
                 .HasOne(s => s.Group)
                 .WithMany(g => g.Members)
                 .HasForeignKey(s => s.GroupId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Group>()
                 .HasOne(g => g.Project)
                 .WithMany(p => p.Groups)
                 .HasForeignKey(g => g.ProjectId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Group>()
                 .HasOne(g => g.Leader)
                 .WithMany()
                 .HasForeignKey(g => g.LeaderId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Group)
+                .WithMany(g => g.GroupRequests)
+                .HasForeignKey(gr => gr.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Project)
+                .WithMany(p => p.GroupRequests)
+                .HasForeignKey(gr => gr.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Student)
+                .WithMany(s => s.GroupRequests)
+                .HasForeignKey(gr => gr.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(gr => gr.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Project>()
                 .HasOne(p => p.Company)
@@ -174,6 +221,42 @@ namespace wspolpracujmy.Data
                 .WithMany(u => u.Notifications)
                 .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Group)
+                .WithMany(g => g.GroupRequests)
+                .HasForeignKey(gr => gr.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Project)
+                .WithMany(p => p.GroupRequests)
+                .HasForeignKey(gr => gr.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.Student)
+                .WithMany(s => s.GroupRequests)
+                .HasForeignKey(gr => gr.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(gr => gr.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupRequest>()
+                .HasOne(gr => gr.RespondedByUser)
+                .WithMany()
+                .HasForeignKey(gr => gr.RespondedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.GroupRequest)
+                .WithMany()
+                .HasForeignKey(n => n.GroupRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<CalendarEvent>()
                 .HasOne(c => c.Group)

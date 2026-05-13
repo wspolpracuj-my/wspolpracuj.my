@@ -142,6 +142,10 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("gcs_object_name");
 
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
                     b.Property<string>("OriginalName")
                         .IsRequired()
                         .HasColumnType("text")
@@ -172,7 +176,6 @@ namespace wspolpracujmy.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("IsAccepted")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("is_accepted");
 
@@ -180,12 +183,16 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("leader_id");
 
+                    b.Property<int?>("MaxMembers")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_members");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.Property<int>("ProjectId")
+                    b.Property<int?>("ProjectId")
                         .HasColumnType("integer")
                         .HasColumnName("project_id");
 
@@ -236,15 +243,24 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("integer")
+                        .HasColumnName("project_id");
+
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("responded_at");
 
+                    b.Property<int?>("RespondedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("responded_by_user_id");
+
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<int>("StudentId")
+                    b.Property<int?>("StudentId")
                         .HasColumnType("integer")
                         .HasColumnName("student_id");
 
@@ -253,6 +269,16 @@ namespace wspolpracujmy.Migrations
                         .HasColumnName("type");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("RespondedByUserId");
+
+                    b.HasIndex("StudentId");
 
                     b.ToTable("GroupRequests", (string)null);
                 });
@@ -268,6 +294,7 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("type");
 
@@ -290,6 +317,18 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("content");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("GroupRequestId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_request_id");
+
+                    b.Property<string>("LinkTarget")
+                        .HasColumnType("text")
+                        .HasColumnName("link_target");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -300,6 +339,8 @@ namespace wspolpracujmy.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GroupRequestId");
 
                     b.HasIndex("UserId");
 
@@ -385,6 +426,7 @@ namespace wspolpracujmy.Migrations
             modelBuilder.Entity("wspolpracujmy.Models.ProjectTag", b =>
                 {
                     b.Property<int>("ProjectId")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasColumnName("project_id");
 
@@ -448,7 +490,7 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("text")
                         .HasColumnName("email");
 
-                    b.Property<int>("GroupId")
+                    b.Property<int?>("GroupId")
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
@@ -496,18 +538,20 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Login")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("login");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<string>("Password")
+                    b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("password");
+                        .HasColumnName("password_hash");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -516,7 +560,8 @@ namespace wspolpracujmy.Migrations
 
                     b.Property<string>("Surname")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("surname");
 
                     b.HasKey("Id");
@@ -586,8 +631,7 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Project", "Project")
                         .WithMany("Groups")
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Leader");
 
@@ -613,13 +657,60 @@ namespace wspolpracujmy.Migrations
                     b.Navigation("Group");
                 });
 
+            modelBuilder.Entity("wspolpracujmy.Models.GroupRequest", b =>
+                {
+                    b.HasOne("wspolpracujmy.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("wspolpracujmy.Models.Group", "Group")
+                        .WithMany("GroupRequests")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("wspolpracujmy.Models.Project", "Project")
+                        .WithMany("GroupRequests")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("wspolpracujmy.Models.User", "RespondedByUser")
+                        .WithMany()
+                        .HasForeignKey("RespondedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("wspolpracujmy.Models.Student", "Student")
+                        .WithMany("GroupRequests")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("RespondedByUser");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("wspolpracujmy.Models.Notification", b =>
                 {
+                    b.HasOne("wspolpracujmy.Models.GroupRequest", "GroupRequest")
+                        .WithMany()
+                        .HasForeignKey("GroupRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("GroupRequest");
 
                     b.Navigation("User");
                 });
@@ -686,8 +777,7 @@ namespace wspolpracujmy.Migrations
                     b.HasOne("wspolpracujmy.Models.Group", "Group")
                         .WithMany("Members")
                         .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithOne("Student")
@@ -716,6 +806,8 @@ namespace wspolpracujmy.Migrations
 
                     b.Navigation("GroupFiles");
 
+                    b.Navigation("GroupRequests");
+
                     b.Navigation("Members");
                 });
 
@@ -723,9 +815,16 @@ namespace wspolpracujmy.Migrations
                 {
                     b.Navigation("Comments");
 
+                    b.Navigation("GroupRequests");
+
                     b.Navigation("Groups");
 
                     b.Navigation("ProjectTags");
+                });
+
+            modelBuilder.Entity("wspolpracujmy.Models.Student", b =>
+                {
+                    b.Navigation("GroupRequests");
                 });
 
             modelBuilder.Entity("wspolpracujmy.Models.Tag", b =>
