@@ -238,23 +238,20 @@ namespace wspolpracujmy.Controllers
                         }
                     }
                 }
-                else if (string.Equals(reqType, "ProjectRequest", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(reqType, "ProjectRequest", StringComparison.OrdinalIgnoreCase) && dto.ProjectId.HasValue)
                 {
-                    if (dto.ProjectId.HasValue)
+                    var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == dto.ProjectId.Value);
+                    if (project != null && project.Company != null)
                     {
-                        var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == dto.ProjectId.Value);
-                        if (project != null && project.Company != null)
+                        var companyUser = await _db.Users.FindAsync(project.Company.UserId);
+                        if (companyUser != null)
                         {
-                            var companyUser = await _db.Users.FindAsync(project.Company.UserId);
-                            if (companyUser != null)
-                            {
-                                var content = $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {project.Topic}";
-                                notificationsToCreate.Add((companyUser.Id, content, linkTarget));
-                                // assign requested project to group and mark as pending approval
-                                group.ProjectId = dto.ProjectId.Value;
-                                group.IsAccepted = GroupStatus.Pending;
-                                _db.Groups.Update(group);
-                            }
+                            var content = $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {project.Topic}";
+                            notificationsToCreate.Add((companyUser.Id, content, linkTarget));
+                            // assign requested project to group and mark as pending approval
+                            group.ProjectId = dto.ProjectId.Value;
+                            group.IsAccepted = GroupStatus.Pending;
+                            _db.Groups.Update(group);
                         }
                     }
                 }
