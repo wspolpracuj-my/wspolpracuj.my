@@ -251,6 +251,10 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("responded_at");
 
+                    b.Property<int?>("RespondedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("responded_by_user_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -271,6 +275,8 @@ namespace wspolpracujmy.Migrations
                     b.HasIndex("GroupId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("RespondedByUserId");
 
                     b.HasIndex("StudentId");
 
@@ -670,6 +676,11 @@ namespace wspolpracujmy.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("wspolpracujmy.Models.User", "RespondedByUser")
+                        .WithMany()
+                        .HasForeignKey("RespondedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("wspolpracujmy.Models.Student", "Student")
                         .WithMany("GroupRequests")
                         .HasForeignKey("StudentId")
@@ -680,6 +691,8 @@ namespace wspolpracujmy.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("Project");
+
+                    b.Navigation("RespondedByUser");
 
                     b.Navigation("Student");
                 });

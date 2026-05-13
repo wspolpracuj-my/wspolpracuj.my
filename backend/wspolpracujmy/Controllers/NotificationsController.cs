@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -35,6 +36,7 @@ namespace wspolpracujmy.Controllers
         // public async Task<IEnumerable<Notification>> Get() => await _db.Notifications.ToListAsync();
 
         [HttpGet("{id:int}")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Pobiera powiadomienie po identyfikatorze.
         /// </summary>
@@ -48,7 +50,8 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<NotificationDto>>> GetForUser([FromQuery] int? userId = null)
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        public async Task<ActionResult<IEnumerable<NotificationDto>>> GetForUser([FromQuery] int? userId)
         {
             var currentUserId = GetCurrentUserId();
             var targetUserId = userId ?? currentUserId;
@@ -56,6 +59,41 @@ namespace wspolpracujmy.Controllers
                 return Forbid("Brak uprawnień do przeglądania powiadomień innego użytkownika.");
 
             var list = await _notifications.GetNotificationsForUserAsync(targetUserId);
+            return Ok(list);
+        }
+
+        [HttpGet("all")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        /// <summary>
+        /// Zwraca wszystkie powiadomienia wszystkich użytkowników — tylko dla administratora.
+        /// </summary>
+        public async Task<ActionResult<IEnumerable<DTOs.AdminNotificationDto>>> GetAllNotifications()
+        {
+            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            var currentUser = await _db.Users.FindAsync(currentUserId);
+            if (currentUser == null) return Unauthorized();
+
+            if (currentUser.Role != Models.Role.Admin) return Forbid();
+
+            var list = await _db.Notifications
+                .Include(n => n.User)
+                .OrderByDescending(n => n.CreatedAt)
+                .Select(n => new DTOs.AdminNotificationDto
+                {
+                    Id = n.Id,
+                    UserId = n.UserId,
+                    UserName = n.User != null ? n.User.Name + " " + n.User.Surname : null,
+                    Content = n.Content,
+                    Status = n.Status,
+                    CreatedAt = n.CreatedAt,
+                    LinkTarget = n.LinkTarget,
+                    GroupRequestId = n.GroupRequestId
+                })
+                .ToListAsync();
+
             return Ok(list);
         }
 
@@ -87,6 +125,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost("mark-read")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<IActionResult> MarkRead([FromBody] int[] ids)
         {
             if (ids == null || ids.Length == 0) return BadRequest("Tablica 'ids' jest wymagana.");

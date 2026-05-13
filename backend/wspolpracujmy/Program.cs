@@ -110,10 +110,8 @@ if (app.Environment.IsDevelopment())
     await TestDataSeeder.SeedAsync(app);
 }
 app.UseCors(AllowFrontend);
-
-app.UseAuthorization();
 app.UseAuthentication();
-
+app.UseAuthorization();
 
 app.MapControllers();
 
