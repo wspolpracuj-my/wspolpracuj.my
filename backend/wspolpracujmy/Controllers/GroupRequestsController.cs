@@ -85,9 +85,12 @@ namespace wspolpracujmy.Controllers
                 if (creatorStudent == null || !group.LeaderId.HasValue || creatorStudent.Id != group.LeaderId.Value)
                     return Forbid();
 
-                // dto.ProjectId was validated by sanitizer
-                var project = await _db.Projects.FindAsync(dto.ProjectId!.Value);
-                if (project == null) return NotFound($"Projekt o id {dto.ProjectId.Value} nie został znaleziony.");
+                if (!dto.ProjectId.HasValue)
+                    return BadRequest("Brak ProjectId dla typu ProjectRequest.");
+                var projectId = dto.ProjectId.Value;
+
+                var project = await _db.Projects.FindAsync(projectId);
+                if (project == null) return NotFound($"Projekt o id {projectId} nie został znaleziony.");
 
                 if (project.MaxGroups.HasValue)
                 {
