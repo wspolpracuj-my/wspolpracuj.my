@@ -204,7 +204,6 @@ namespace wspolpracujmy.Controllers
                 }
                 _db.GroupRequests.Add(entity);
 
-                var createdAt = DateTime.UtcNow;
                 const string linkTarget = "/requests";
 
                 // Collect notifications to create after the GroupRequest entity is saved
