@@ -192,15 +192,12 @@ namespace wspolpracujmy.Controllers
                         .AnyAsync(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted);
                     if (existsTx) return BadRequest("Nie można wysłać prośby o ten projekt — istnieje już aktywna (oczekująca lub zaakceptowana) prośba dla tej grupy.");
                 }
-                else if (reqTypeNormTx == "invitation" || reqTypeNormTx == "invite")
+                else if ((reqTypeNormTx == "invitation" || reqTypeNormTx == "invite") && targetStudentId.HasValue)
                 {
-                    if (targetStudentId.HasValue)
-                    {
-                        var existsTx = await _db.GroupRequests
-                            .Where(gr => gr.GroupId == dto.GroupId && gr.StudentId == targetStudentId && gr.Type != null && gr.Type.ToLower() == reqTypeNormTx)
-                            .AnyAsync(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted);
-                        if (existsTx) return BadRequest("Nie możesz wysłać zaproszenia — istnieje już aktywne (oczekujące lub zaakceptowane) zaproszenie dla tego studenta i tej grupy.");
-                    }
+                    var existsTx = await _db.GroupRequests
+                        .Where(gr => gr.GroupId == dto.GroupId && gr.StudentId == targetStudentId && gr.Type != null && gr.Type.ToLower() == reqTypeNormTx)
+                        .AnyAsync(e => e.Status == GroupStatus.Pending || e.Status == GroupStatus.Accepted);
+                    if (existsTx) return BadRequest("Nie możesz wysłać zaproszenia — istnieje już aktywne (oczekujące lub zaakceptowane) zaproszenie dla tego studenta i tej grupy.");
                 }
                 _db.GroupRequests.Add(entity);
 
