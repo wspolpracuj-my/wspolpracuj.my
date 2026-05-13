@@ -69,7 +69,8 @@ namespace wspolpracujmy.Controllers
             if (role == "Company")
             {
                 if (!userIdMaybe.HasValue) return Unauthorized();
-                var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userIdMaybe.Value);
+                var userId = userIdMaybe.Value;
+                var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userId);
                 if (companyForUser == null) return Forbid();
                 dto.CompanyId = companyForUser.Id;
             }
