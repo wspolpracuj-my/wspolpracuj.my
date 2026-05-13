@@ -346,9 +346,8 @@ namespace wspolpracujmy.Controllers
                     // allow company to respond to applications where they are the project owner
                     if (reqType == "application" && req.ProjectId.HasValue)
                     {
-                        var projectId = req.ProjectId;
-                        if (!projectId.HasValue) return BadRequest("Brak powiązanego projektu dla tej prośby.");
-                        var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId.Value);
+                        var projectId = req.ProjectId.Value;
+                        var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
                         if (project == null) return NotFound("Powiązany projekt nie został znaleziony.");
                         if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
                     }
