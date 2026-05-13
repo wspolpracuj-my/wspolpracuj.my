@@ -118,7 +118,8 @@ namespace wspolpracujmy.Controllers
 
             // load student entity if present
             Student? targetStudent = null;
-            if (targetStudentId.HasValue) targetStudent = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == targetStudentId.Value);
+            if (targetStudentId is int targetId)
+                targetStudent = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == targetId);
 
             // State-based validation: prevent duplicate or concurrent requests of same type for same relation
             var reqTypeNorm = reqType.ToLowerInvariant();
