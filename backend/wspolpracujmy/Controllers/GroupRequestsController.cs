@@ -336,9 +336,9 @@ namespace wspolpracujmy.Controllers
             {
                 // only group leader (for the group) or admin OR company (for applications where company responds) can respond
                 var isLeader = false;
-                if (group != null && group.LeaderId.HasValue)
+                if (group?.LeaderId is int leaderId)
                 {
-                    var leader = await _db.Students.FirstOrDefaultAsync(s => s.Id == group.LeaderId.Value);
+                    var leader = await _db.Students.FirstOrDefaultAsync(s => s.Id == leaderId);
                     if (leader != null && leader.UserId == currentUserId) isLeader = true;
                 }
                 if (!isAdmin && !isLeader)
