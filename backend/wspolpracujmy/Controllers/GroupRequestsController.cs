@@ -401,6 +401,51 @@ namespace wspolpracujmy.Controllers
                         // ignore notification errors
                     }
                 }
+
+            // Handle Application acceptance: add the applicant (CreatedByUserId) to the group when accepted.
+            if (action == "accept" && req.Type != null && req.Type.Equals("Application", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var applicant = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.UserId == req.CreatedByUserId);
+                    if (applicant != null)
+                    {
+                        var affected = await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Students\" SET group_id = {req.GroupId} WHERE id = {applicant.Id}");
+                        if (affected == 0)
+                        {
+                            applicant.GroupId = req.GroupId;
+                            _db.Students.Update(applicant);
+                            await _db.SaveChangesAsync();
+                        }
+
+                        try
+                        {
+                            await _db.Entry(applicant).ReloadAsync();
+                        }
+                        catch
+                        {
+                        }
+
+                        try
+                        {
+                            var members = await _db.Students.Where(s => s.GroupId == req.GroupId).ToListAsync();
+                            var joinerName = applicant.User != null ? $"{applicant.User.Name} {applicant.User.Surname}" : applicant.Email;
+                            var contentJoin = $"Student {joinerName} dołączył do zespołu {group?.Name}.";
+                            foreach (var m in members)
+                            {
+                                await _notifications.CreateNotificationAsync(m.UserId, contentJoin, $"group:{group?.Id}");
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore application acceptance side-effects failures
+                }
+            }
             }
 
             // notify relevant users

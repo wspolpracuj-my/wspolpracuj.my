@@ -127,6 +127,15 @@ CREATE TABLE "ProjectTags" (
   PRIMARY KEY ("project_id", "tag_id")
 );
 
+CREATE TABLE "ProjectFiles" (
+  "id" uuid PRIMARY KEY,
+  "original_file_name" character varying(255) NOT NULL,
+  "gcs_object_name" character varying(512) NOT NULL,
+  "content_type" character varying(255) NOT NULL,
+  "team_id" integer NOT NULL,
+  "upload_date" timestamp with time zone NOT NULL
+);
+
 ALTER TABLE "Companies"
   ADD CONSTRAINT "FK_Companies_Users_user_id"
   FOREIGN KEY ("user_id") REFERENCES "Users" ("id") ON DELETE CASCADE;

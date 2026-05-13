@@ -22,14 +22,16 @@ namespace wspolpracujmy.Controllers
     {
         private readonly AppDbContext _db;
         private readonly NotificationService _notifications;
+        private readonly TeamCleanupService _teamCleanup;
         /// <summary>
         /// Tworzy kontroler grup z kontekstem bazy danych.
         /// </summary>
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
-        public GroupsController(AppDbContext db, NotificationService notifications)
+        public GroupsController(AppDbContext db, NotificationService notifications, TeamCleanupService teamCleanup)
         {
             _db = db;
             _notifications = notifications;
+            _teamCleanup = teamCleanup;
         }
 
         [HttpGet]
@@ -56,7 +58,7 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<Group>> Get(int id)
         {
             var g = await _db.Groups.Include(x => x.Members).FirstOrDefaultAsync(x => x.Id == id);
-            if (g == null) return NotFound();
+            if (g == null) return NotFound(new { error = "Grupa nie została znaleziona." });
             return g;
         }
 
@@ -64,24 +66,24 @@ namespace wspolpracujmy.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<ActionResult<IEnumerable<Group>>> GetByProjectId(int projectId)
         {
-            if (projectId <= 0) return BadRequest("Parametr projectId musi być większy niż 0.");
+            if (projectId <= 0) return BadRequest(new { error = "Nieprawidłowy numer projektu." });
 
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
-            if (project == null) return NotFound();
+            if (project == null) return NotFound(new { error = "Projekt nie został znaleziony." });
 
             var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
                          ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
 
             var currentUser = await _db.Users.FindAsync(currentUserId);
-            if (currentUser == null) return Unauthorized();
+            if (currentUser == null) return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
 
             if (currentUser.Role != Models.Role.Admin)
             {
                 // company must be owner of project
-                if (currentUser.Role != Models.Role.Company) return Forbid();
-                if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
+                if (currentUser.Role != Models.Role.Company) return StatusCode(403, new { error = "Nie masz uprawnień do wyświetlania tej strony." });
+                if (project.Company == null || project.Company.UserId != currentUserId) return StatusCode(403, new { error = "Nie masz dostępu do tego projektu." });
             }
 
             var groups = await _db.Groups
@@ -102,29 +104,29 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<CreateGroupResultDto>> Post([FromBody] CreateGroupDto dto)
         {
             if (dto == null) return BadRequest();
-            if (string.IsNullOrWhiteSpace(dto.Name)) return BadRequest("Nazwa jest wymagana.");
+            if (string.IsNullOrWhiteSpace(dto.Name)) return BadRequest(new { error = "Nazwa grupy jest wymagana." });
 
             // Pobierz aktualnego użytkownika z tokena
             var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
                          ?? User?.FindFirst("sub")?.Value;
             if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
-                return Unauthorized();
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
 
             // Determine the leader from the authenticated user to avoid spoofing leaderId in DTO
             var currentStudent = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.UserId == currentUserId);
-            if (currentStudent == null) return Forbid();
+            if (currentStudent == null) return StatusCode(403, new { error = "Nie jesteś studentem." });
 
             // Student może być liderem tylko jednej grupy i nie może już należeć do grupy
             var alreadyLeader = await _db.Groups.AnyAsync(g => g.LeaderId == currentStudent.Id);
-            if (alreadyLeader) return BadRequest("Masz już przypisaną grupę jako lider.");
+            if (alreadyLeader) return BadRequest(new { error = "Już prowadzisz jedną grupę." });
 
-            if (currentStudent.GroupId.HasValue) return BadRequest("Masz już przypisaną grupę.");
+            if (currentStudent.GroupId.HasValue) return BadRequest(new { error = "Już jesteś członkiem grupy." });
 
             // Unikalność nazwy (case-insensitive)
             var normalized = dto.Name.Trim().ToLower();
             var nameTaken = await _db.Groups.AnyAsync(g => g.Name.ToLower() == normalized);
-            if (nameTaken) return BadRequest("Nazwa grupy jest już zajęta.");
+            if (nameTaken) return BadRequest(new { error = "Ta nazwa grupy jest już zajęta. Wybierz inną." });
 
             await using var transaction = await _db.Database.BeginTransactionAsync();
 
@@ -132,6 +134,8 @@ namespace wspolpracujmy.Controllers
             {
                 Name = dto.Name.Trim(),
                 LeaderId = currentStudent.Id,
+                // Ensure non-null value is stored even if DB column is not nullable yet
+                IsAccepted = Models.GroupStatus.Pending,
                 Members = new List<Student>(),
                 GroupRequests = new List<GroupRequest>(),
                 GroupFiles = new List<GroupFile>(),
@@ -173,10 +177,10 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) gdy zakończono pomyślnie.</returns>
         public async Task<IActionResult> Patch(int id, [FromBody] JsonPatchDocument<Group> patch)
         {
-            if (patch == null) return BadRequest();
+            if (patch == null) return BadRequest(new { error = "Żądanie jest puste." });
 
             var group = await _db.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
-            if (group == null) return NotFound();
+            if (group == null) return NotFound(new { error = "Grupa nie została znaleziona." });
 
             // get current user and student
             var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -186,14 +190,14 @@ namespace wspolpracujmy.Controllers
                 return Unauthorized();
 
             var currentStudent = await _db.Students.FirstOrDefaultAsync(s => s.UserId == currentUserId);
-            if (currentStudent == null) return Forbid();
+            if (currentStudent == null) return StatusCode(403, new { error = "Nie jesteś studentem." });
 
             if (!group.LeaderId.HasValue || group.LeaderId.Value != currentStudent.Id)
-                return Forbid();
+                return StatusCode(403, new { error = "Nie masz uprawnień do edycji tej grupy." });
 
             // Stosujemy patch na obiekcie w pamięci, następnie walidujemy konkretne reguły
             patch.ApplyTo(group, ModelState);
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid) return BadRequest(new { error = "Nieprawidłowe dane. Sprawdź pola i spróbuj ponownie." });
 
             // Walidacja unikalności nazwy (exclude current group)
             if (!string.IsNullOrWhiteSpace(group.Name))
@@ -244,8 +248,7 @@ namespace wspolpracujmy.Controllers
             if (!isAdmin && !isLeader)
                 return Forbid();
 
-            _db.Groups.Remove(g);
-            await _db.SaveChangesAsync();
+            await _teamCleanup.DeleteTeamAndCleanupFilesAsync(id);
             return NoContent();
         }
 

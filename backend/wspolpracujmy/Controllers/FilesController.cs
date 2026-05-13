@@ -1,138 +1,379 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.Models;
+using wspolpracujmy.Services;
 
 namespace wspolpracujmy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     /// <summary>
-    /// Kontroler do zarządzania metadanymi plików (projekty, grupy).
+    /// Kontroler do zarządzania plikami w Google Cloud Storage.
     /// </summary>
     public class FilesController : ControllerBase
     {
         private readonly AppDbContext _db;
-        /// <summary>
-        /// Tworzy kontroler plików z kontekstem bazy danych.
-        /// </summary>
-        /// <param name="db">Kontekst bazy danych aplikacji.</param>
-        public FilesController(AppDbContext db) => _db = db;
+        private readonly GcsService _gcsService;
 
-        // [HttpGet]
-        // Removed: returning all files. Use project-specific or owner-specific listing instead.
-        // public async Task<IEnumerable<FileEntity>> Get() => await _db.Files.ToListAsync();
-
-        [HttpGet("{id:guid}")]
-        /// <summary>
-        /// Pobiera metadane pliku po identyfikatorze GUID.
-        /// </summary>
-        /// <param name="id">Id pliku (GUID).</param>
-        /// <returns>Obiekt metadanych pliku lub NotFound.</returns>
-        public async Task<ActionResult<FileEntity>> Get(Guid id)
+        public FilesController(AppDbContext db, GcsService gcsService)
         {
-            var f = await _db.Files.FindAsync(id);
-            if (f == null) return NotFound();
-            return f;
+            _db = db;
+            _gcsService = gcsService;
         }
 
-        [HttpGet("group/{groupId}")]
-        public async Task<ActionResult<IEnumerable<FileEntity>>> GetByGroupId(int groupId)
+        [HttpPost("upload")]
+        [Authorize]
+        [RequestFormLimits(MultipartBodyLengthLimit = 52428800)]
+        [Consumes("multipart/form-data")]
+        [Produces("application/json")]
+        /// <summary>
+        /// Uploaduje plik do Google Cloud Storage i zapisuje metadane w bazie.
+        /// </summary>
+        /// <param name="file">Plik do uploadowania.</param>
+        /// <param name="teamId">ID zespołu (opcjonalnie, wymagane dla admina i firm).</param>
+        /// <param name="cancellationToken">Token anulowania operacji.</param>
+        /// <returns>Utworzony ProjectFile z kodem 201 Created.</returns>
+        /// <response code="201">Plik został pomyślnie uploadowany.</response>
+        /// <response code="400">Plik jest wymagany lub brakuje teamId.</response>
+        /// <response code="401">Użytkownik nieuwierzytelniony.</response>
+        /// <response code="403">Użytkownik nie ma dostępu do danego zespołu.</response>
+        public async Task<ActionResult<ProjectFile>> Upload(IFormFile file, [FromQuery] int? teamId = null, CancellationToken cancellationToken = default)
         {
-            var files = await _db.Files
-                .Where(f => f.GroupId == groupId)
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { error = "Nie wybrałeś pliku. Proszę wybrać plik do wysłania." });
+            }
+
+            var userId = await GetCurrentUserIdAsync();
+            if (userId == null)
+            {
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+            }
+
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId.Value, cancellationToken);
+
+            if (user == null)
+            {
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+            }
+
+            int? resolvedTeamId = null;
+
+            if (user.Role == Role.Admin)
+            {
+                if (teamId == null)
+                {
+                    return BadRequest(new { error = "Aby wysłać plik, musisz podać ID zespołu. Dodaj do adresu URL: ?teamId=123" });
+                }
+                resolvedTeamId = teamId;
+            }
+            else if (user.Role == Role.Company)
+            {
+                if (teamId == null)
+                {
+                    return BadRequest(new { error = "Aby wysłać plik, musisz podać ID zespołu. Dodaj do adresu URL: ?teamId=123" });
+                }
+                var hasAccess = await CompanyHasAccessToFileAsync(userId.Value, teamId.Value, cancellationToken);
+                if (!hasAccess)
+                {
+                    return Forbid();
+                }
+                resolvedTeamId = teamId;
+            }
+            else
+            {
+                resolvedTeamId = await GetCurrentTeamIdAsync(userId.Value);
+                if (resolvedTeamId == null)
+                {
+                    return BadRequest(new { error = "Nie jesteś członkiem żadnego zespołu. Skontaktuj się z administratorem." });
+                }
+            }
+
+            await using var stream = file.OpenReadStream();
+            var objectName = await _gcsService.UploadFileAsync(
+                stream,
+                file.FileName,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                resolvedTeamId.Value,
+                cancellationToken);
+
+            var projectFile = new ProjectFile
+            {
+                OriginalFileName = Path.GetFileName(file.FileName),
+                GcsObjectName = objectName,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                TeamId = resolvedTeamId.Value,
+                UploadDate = DateTime.UtcNow
+            };
+
+            _db.ProjectFiles.Add(projectFile);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return CreatedAtAction(nameof(Download), new { fileId = projectFile.Id }, projectFile);
+        }
+
+        [HttpGet("download/{fileId:guid}")]
+        [Authorize]
+        [Produces("application/json")]
+        /// <summary>
+        /// Generuje Signed URL do pobrania pliku z Google Cloud Storage.
+        /// </summary>
+        /// <param name="fileId">ID pliku do pobrania.</param>
+        /// <param name="cancellationToken">Token anulowania operacji.</param>
+        /// <returns>Obiekt zawierający signed URL ważny przez 15 minut.</returns>
+        /// <response code="200">URL został pomyślnie wygenerowany.</response>
+        /// <response code="401">Użytkownik nieuwierzytelniony.</response>
+        /// <response code="403">Użytkownik nie ma dostępu do tego pliku.</response>
+        /// <response code="404">Plik nie został znaleziony.</response>
+        public async Task<ActionResult<object>> Download(Guid fileId, CancellationToken cancellationToken)
+        {
+            var projectFile = await _db.ProjectFiles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(f => f.Id == fileId, cancellationToken);
+
+            if (projectFile == null)
+            {
+                return NotFound(new { error = "Plik nie został znaleziony." });
+            }
+
+            var userId = await GetCurrentUserIdAsync();
+            if (userId == null)
+            {
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+            }
+
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId.Value, cancellationToken);
+
+            if (user == null)
+            {
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+            }
+
+            var hasAccess = false;
+
+            if (user.Role == Role.Admin)
+            {
+                hasAccess = true;
+            }
+            else if (user.Role == Role.Student)
+            {
+                var teamId = await GetCurrentTeamIdAsync(userId.Value);
+                hasAccess = teamId.HasValue && teamId.Value == projectFile.TeamId;
+            }
+            else if (user.Role == Role.Company)
+            {
+                hasAccess = await CompanyHasAccessToFileAsync(userId.Value, projectFile.TeamId, cancellationToken);
+            }
+
+            if (!hasAccess)
+            {
+                return StatusCode(403, new { error = "Nie masz dostępu do tego pliku." });
+            }
+
+            var downloadUrl = await _gcsService.GenerateDownloadUrlAsync(projectFile.GcsObjectName);
+            return Ok(new { url = downloadUrl });
+        }
+
+        [HttpDelete("{fileId:guid}")]
+        [Authorize]
+        /// <summary>
+        /// Usuwa plik z Google Cloud Storage i bazy danych.
+        /// </summary>
+        /// <param name="fileId">ID pliku do usunięcia.</param>
+        /// <param name="cancellationToken">Token anulowania operacji.</param>
+        /// <returns>Brak treści (204) gdy usunięto pomyślnie.</returns>
+        /// <response code="204">Plik został pomyślnie usunięty.</response>
+        /// <response code="401">Użytkownik nieuwierzytelniony.</response>
+        /// <response code="403">Użytkownik nie ma dostępu do usunięcia tego pliku.</response>
+        /// <response code="404">Plik nie został znaleziony.</response>
+        public async Task<IActionResult> Delete(Guid fileId, CancellationToken cancellationToken)
+        {
+            var projectFile = await _db.ProjectFiles
+                .FirstOrDefaultAsync(f => f.Id == fileId, cancellationToken);
+
+            if (projectFile == null)
+            {
+                return NotFound(new { error = "Plik nie został znaleziony." });
+            }
+
+            var userId = await GetCurrentUserIdAsync();
+            if (userId == null)
+            {
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+            }
+
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId.Value, cancellationToken);
+
+            if (user == null)
+            {
+                return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+            }
+
+            var hasAccess = false;
+
+            if (user.Role == Role.Admin)
+            {
+                hasAccess = true;
+            }
+            else if (user.Role == Role.Student)
+            {
+                var teamId = await GetCurrentTeamIdAsync(userId.Value);
+                hasAccess = teamId.HasValue && teamId.Value == projectFile.TeamId;
+            }
+            else if (user.Role == Role.Company)
+            {
+                hasAccess = await CompanyHasAccessToFileAsync(userId.Value, projectFile.TeamId, cancellationToken);
+            }
+
+            if (!hasAccess)
+            {
+                return StatusCode(403, new { error = "Nie masz dostępu do usunięcia tego pliku." });
+            }
+
+            _db.ProjectFiles.Remove(projectFile);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                await _gcsService.DeleteFileAsync(projectFile.GcsObjectName, cancellationToken);
+            }
+            catch
+            {
+            }
+
+            return NoContent();
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Produces("application/json")]
+        /// <summary>
+        /// Zwraca listę plików dla danego zespołu (lub dla zalogowanego studenta).
+        /// </summary>
+        /// <param name="teamId">Id zespołu. Dla admina/firmy wymagane; dla studenta pomijane.</param>
+        public async Task<ActionResult<IEnumerable<ProjectFile>>> Get([FromQuery] int? teamId = null)
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId == null) return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId.Value);
+            if (user == null) return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+
+            int? resolvedTeamId = null;
+
+            if (user.Role == Role.Admin)
+            {
+                if (teamId == null) return BadRequest(new { error = "Dla administratora podaj parametr ?teamId=..." });
+                resolvedTeamId = teamId;
+            }
+            else if (user.Role == Role.Company)
+            {
+                if (teamId == null) return BadRequest(new { error = "Dla firmy podaj parametr ?teamId=..." });
+                var hasAccess = await CompanyHasAccessToFileAsync(userId.Value, teamId.Value, CancellationToken.None);
+                if (!hasAccess) return Forbid();
+                resolvedTeamId = teamId;
+            }
+            else // Student
+            {
+                resolvedTeamId = await GetCurrentTeamIdAsync(userId.Value);
+                if (resolvedTeamId == null) return BadRequest(new { error = "Nie jesteś członkiem żadnego zespołu." });
+            }
+
+            var files = await _db.ProjectFiles
+                .AsNoTracking()
+                .Where(f => f.TeamId == resolvedTeamId.Value)
                 .ToListAsync();
-            return files;
+
+            return Ok(files);
         }
 
-        [HttpPost]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        [HttpGet("{fileId:guid}")]
+        [Authorize]
+        [Produces("application/json")]
         /// <summary>
-        /// Tworzy nowe metadane pliku w bazie.
+        /// Zwraca metadane pliku (bez linku do pobrania).
         /// </summary>
-        /// <param name="file">Obiekt metadanych pliku do zapisania.</param>
-        /// <returns>Utworzony obiekt pliku z kodem 201 Created.</returns>
-        public async Task<ActionResult<FileEntity>> Post(FileEntity file)
+        public async Task<ActionResult<ProjectFile>> GetMetadata(Guid fileId)
         {
-            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
-                return Unauthorized();
+            var projectFile = await _db.ProjectFiles.AsNoTracking().FirstOrDefaultAsync(f => f.Id == fileId);
+            if (projectFile == null) return NotFound(new { error = "Plik nie został znaleziony." });
 
-            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+            var userId = await GetCurrentUserIdAsync();
+            if (userId == null) return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
 
-            if (role != "Admin")
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId.Value);
+            if (user == null) return Unauthorized(new { error = "Sesja wygasła. Zaloguj się ponownie." });
+
+            var hasAccess = false;
+            if (user.Role == Role.Admin) hasAccess = true;
+            else if (user.Role == Role.Student)
             {
-                file.UserId = currentUserId;
+                var teamId = await GetCurrentTeamIdAsync(userId.Value);
+                hasAccess = teamId.HasValue && teamId.Value == projectFile.TeamId;
+            }
+            else if (user.Role == Role.Company)
+            {
+                hasAccess = await CompanyHasAccessToFileAsync(userId.Value, projectFile.TeamId, CancellationToken.None);
             }
 
-            _db.Files.Add(file);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(Get), new { id = file.Id }, file);
+            if (!hasAccess) return StatusCode(403, new { error = "Nie masz dostępu do tego pliku." });
+
+            return Ok(projectFile);
         }
 
-        [HttpPut("{id:guid}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
-        /// <summary>
-        /// Aktualizuje metadane pliku (zamienia cały obiekt).
-        /// </summary>
-        /// <param name="id">Id pliku (GUID).</param>
-        /// <param name="file">Zaktualizowany obiekt pliku.</param>
-        /// <returns>Brak treści (204) gdy zakończono pomyślnie.</returns>
-        public async Task<IActionResult> Put(Guid id, FileEntity file)
+        private async Task<int?> GetCurrentUserIdAsync()
         {
-            if (id != file.Id) return BadRequest();
-
-            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            /// Pobiera ID zalogowanego użytkownika z JWT claims.
+            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
                          ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
-                return Unauthorized();
 
-            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
-
-            if (role != "Admin")
+            if (!int.TryParse(userIdStr, out var userId))
             {
-                var existing = await _db.Files.FindAsync(id);
-                if (existing == null) return NotFound();
-                if (existing.UserId != currentUserId) return Forbid();
-                file.UserId = existing.UserId;
+                return null;
             }
 
-            _db.Entry(file).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            return NoContent();
+            return await Task.FromResult(userId);
         }
 
-        [HttpDelete("{id:guid}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
-        /// <summary>
-        /// Usuwa metadane pliku po identyfikatorze.
-        /// </summary>
-        /// <param name="id">Id pliku (GUID) do usunięcia.</param>
-        /// <returns>Brak treści (204) gdy usunięto, lub NotFound.</returns>
-        public async Task<IActionResult> Delete(Guid id)
+        private async Task<int?> GetCurrentTeamIdAsync(int currentUserId)
         {
-            var f = await _db.Files.FindAsync(id);
-            if (f == null) return NotFound();
+            /// Pobiera ID zespołu (grupy) zalogowanego użytkownika lub z JWT claim "teamId".
+            var teamIdStr = User?.FindFirst("teamId")?.Value
+                         ?? User?.FindFirst("groupId")?.Value;
 
-            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
-                return Unauthorized();
+            if (int.TryParse(teamIdStr, out var parsedTeamId))
+            {
+                return await Task.FromResult(parsedTeamId);
+            }
 
-            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
-            if (role != "Admin" && f.UserId != currentUserId) return Forbid();
+            return await _db.Students
+                .AsNoTracking()
+                .Where(s => s.UserId == currentUserId)
+                .Select(s => s.GroupId)
+                .FirstOrDefaultAsync();
+        }
 
-            _db.Files.Remove(f);
-            await _db.SaveChangesAsync();
-            return NoContent();
+        private async Task<bool> CompanyHasAccessToFileAsync(int companyUserId, int teamId, CancellationToken cancellationToken)
+        {
+            /// Sprawdza, czy firma ma dostęp do pliku na podstawie przypisanych projektów do grupy.
+            var hasAccess = await _db.Projects
+                .AsNoTracking()
+                .Include(p => p.Groups)
+                .Where(p => p.Company != null && p.Company.UserId == companyUserId)
+                .SelectMany(p => p.Groups)
+                .AnyAsync(g => g.Id == teamId, cancellationToken);
+
+            return hasAccess;
         }
     }
 }

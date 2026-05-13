@@ -35,10 +35,10 @@ namespace wspolpracujmy.Controllers
         /// <returns>Lista DTO odpowiedzi.</returns>
         public async Task<ActionResult<List<ResponseDto>>> GetByComment(int commentId)
         {
-            if (commentId <= 0) return BadRequest("Parametr commentId musi być większy niż 0.");
+            if (commentId <= 0) return BadRequest(new { error = "Nieprawidłowy numer komentarza." });
 
             var exists = await _db.Comments.AnyAsync(c => c.Id == commentId);
-            if (!exists) return NotFound();
+            if (!exists) return NotFound(new { error = "Komentarz nie został znaleziony." });
 
             var responses = await _db.Responses
                 .Where(r => r.CommentId == commentId)
@@ -65,7 +65,7 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzona odpowiedź z kodem 201 Created.</returns>
         public async Task<ActionResult<Response>> Post([FromBody] CreateResponseDto dto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid) return BadRequest(new { error = "Nieprawidłowe dane. Sprawdź pola i spróbuj ponownie." });
 
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value

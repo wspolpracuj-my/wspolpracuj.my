@@ -3,6 +3,9 @@ using wspolpracujmy.Models;
 
 namespace wspolpracujmy.DTOs
 {
+    /// <summary>
+    /// DTO reprezentujące pojedyncze powiadomienie użytkownika.
+    /// </summary>
     public class NotificationDto
     {
         public int Id { get; set; }

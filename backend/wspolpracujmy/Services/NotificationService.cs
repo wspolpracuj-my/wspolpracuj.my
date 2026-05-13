@@ -8,11 +8,17 @@ using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Services
 {
+    /// <summary>
+    /// Serwis do tworzenia i zarządzania powiadomieniami użytkowników.
+    /// </summary>
     public class NotificationService
     {
         private readonly AppDbContext _db;
         public NotificationService(AppDbContext db) => _db = db;
 
+        /// <summary>
+        /// Tworzy nowe powiadomienie dla użytkownika z mechanizmem deduplikacji.
+        /// </summary>
         public async Task<Notification> CreateNotificationAsync(int userId, string content, string? linkTarget = null, int? groupRequestId = null)
         {
             // Dedupe: avoid creating repeated identical notifications for the same user
@@ -48,6 +54,9 @@ namespace wspolpracujmy.Services
             return n;
         }
 
+        /// <summary>
+        /// Zwraca powiadomienia wskazanego użytkownika w kolejności od najnowszych.
+        /// </summary>
         public async Task<List<NotificationDto>> GetNotificationsForUserAsync(int userId)
         {
             return await _db.Notifications
@@ -64,6 +73,9 @@ namespace wspolpracujmy.Services
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Oznacza pojedyncze powiadomienie jako przeczytane.
+        /// </summary>
         public async Task MarkAsReadAsync(int id)
         {
             var n = await _db.Notifications.FindAsync(id);
@@ -72,6 +84,9 @@ namespace wspolpracujmy.Services
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Oznacza wskazane powiadomienia jako przeczytane.
+        /// </summary>
         public async Task MarkAsReadAsync(System.Collections.Generic.IEnumerable<int> ids)
         {
             var list = await _db.Notifications.Where(n => ids.Contains(n.Id)).ToListAsync();
@@ -80,6 +95,9 @@ namespace wspolpracujmy.Services
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Oznacza wskazane powiadomienia użytkownika jako przeczytane.
+        /// </summary>
         public async Task MarkAsReadForUserAsync(int userId, System.Collections.Generic.IEnumerable<int> ids)
         {
             var list = await _db.Notifications

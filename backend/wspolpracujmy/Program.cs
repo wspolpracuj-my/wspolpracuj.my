@@ -7,6 +7,7 @@ using wspolpracujmy.Data;
 using wspolpracujmy.Services;
 using Microsoft.AspNetCore.Authorization;
 using wspolpracujmy.Services.Authorization;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,7 +47,15 @@ builder.Services.AddSwaggerGen(options =>
         {
             [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
         });
+
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    }
 });
+
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -56,6 +65,8 @@ builder.Services.AddScoped<wspolpracujmy.Services.ProjectService>();
 builder.Services.AddScoped<wspolpracujmy.Services.ProjectCommentService>();
 builder.Services.AddScoped<wspolpracujmy.Services.NotificationService>();
 builder.Services.AddScoped<wspolpracujmy.Services.GroupRequestService>();
+builder.Services.AddScoped<GcsService>();
+builder.Services.AddScoped<TeamCleanupService>();
 
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<GroupAuthorizationService>();
@@ -106,8 +117,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
     // Seed development data (runs only in Development)
     // First run the dedicated TagsSeeder so tag names are controlled separately.
-    await TagsSeeder.SeedAsync(app);
-    await TestDataSeeder.SeedAsync(app);
+    // await TagsSeeder.SeedAsync(app);
+    // await TestDataSeeder.SeedAsync(app);
 }
 
 app.UseAuthentication();

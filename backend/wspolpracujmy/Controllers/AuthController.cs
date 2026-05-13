@@ -83,7 +83,7 @@ namespace wspolpracujmy.Controllers
             await transaction.CommitAsync();
 
             // Generuj token
-            var token = _jwtTokenService.GenerateToken(user);
+            var token = await _jwtTokenService.GenerateTokenAsync(user);
 
             var response = new AuthResponse
             {
@@ -107,7 +107,7 @@ namespace wspolpracujmy.Controllers
                 return Unauthorized(new { message = "Nieprawidłowy login lub hasło" });
             }
 
-            var token = _jwtTokenService.GenerateToken(user);
+            var token = await _jwtTokenService.GenerateTokenAsync(user);
 
             var response = new AuthResponse
             {

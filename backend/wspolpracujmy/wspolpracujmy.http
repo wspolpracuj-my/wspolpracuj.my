@@ -4,3 +4,311 @@ GET {{wspolpracujmy_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+### ============================================
+### FILE MANAGEMENT WITH GCS - TEST SCENARIOS
+### ============================================
+
+### STUDENT 1 (Team 1): Login and get token
+POST {{wspolpracujmy_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "student_team1",
+  "password": "SecurePass123!"
+}
+
+@student1_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwibmFtZSI6InN0dWRlbnRfdGVhbTEiLCJpYXQiOjE1MTYyMzkwMjJ9.placeholder
+
+###
+
+### STUDENT 1: Upload file to team 1
+POST {{wspolpracujmy_HostAddress}}/api/files/upload
+Authorization: Bearer {{student1_token}}
+Content-Type: multipart/form-data; boundary=----Student1Upload
+
+------Student1Upload
+Content-Disposition: form-data; name="file"; filename="student1_projekt.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/student1_projekt.pdf
+------Student1Upload--
+
+###
+
+### STUDENT 1: Upload another file to team 1
+POST {{wspolpracujmy_HostAddress}}/api/files/upload
+Authorization: Bearer {{student1_token}}
+Content-Type: multipart/form-data; boundary=----Student1Upload2
+
+------Student1Upload2
+Content-Disposition: form-data; name="file"; filename="student1_sprawozdanie.docx"
+Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+
+< ./sample_files/student1_sprawozdanie.docx
+------Student1Upload2--
+
+###
+
+### STUDENT 1: Download own file (should succeed with signed URL)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{student1_token}}
+
+###
+
+### ============================================
+
+### STUDENT 2 (Team 2): Login and get token
+POST {{wspolpracujmy_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "student_team2",
+  "password": "SecurePass456!"
+}
+
+@student2_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwibmFtZSI6InN0dWRlbnRfdGVhbTIiLCJpYXQiOjE1MTYyMzkwMjJ9.placeholder
+
+###
+
+### STUDENT 2: Upload file to team 2
+POST {{wspolpracujmy_HostAddress}}/api/files/upload
+Authorization: Bearer {{student2_token}}
+Content-Type: multipart/form-data; boundary=----Student2Upload
+
+------Student2Upload
+Content-Disposition: form-data; name="file"; filename="student2_praca.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/student2_praca.pdf
+------Student2Upload--
+
+###
+
+### STUDENT 2: Download own file (should succeed)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440002
+Authorization: Bearer {{student2_token}}
+
+###
+
+### STUDENT 2: Try to download student 1's file (should be forbidden - different team)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{student2_token}}
+
+###
+
+### ============================================
+
+### COMPANY 1: Login and get token
+POST {{wspolpracujmy_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "company1_admin",
+  "password": "CompanyPass123!"
+}
+
+@company1_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwibmFtZSI6ImNvbXBhbnkxX2FkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.placeholder
+
+###
+
+### COMPANY 1: Download any file (should succeed - if file's team works on company's project)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{company1_token}}
+
+###
+
+### COMPANY 1: Upload file to team 1 (should succeed if team 1 is assigned to company1's project, must provide ?teamId=1)
+POST {{wspolpracujmy_HostAddress}}/api/files/upload?teamId=1
+Authorization: Bearer {{company1_token}}
+Content-Type: multipart/form-data; boundary=----Company1Upload
+
+------Company1Upload
+Content-Disposition: form-data; name="file"; filename="company1_instrukcje.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/company1_instrukcje.pdf
+------Company1Upload--
+
+###
+
+### COMPANY 1: Delete file from team 1 (should succeed only if team 1 is assigned to company1's project)
+DELETE {{wspolpracujmy_HostAddress}}/api/files/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{company1_token}}
+
+###
+### ============================================
+### TEAM/GROUP CLEANUP TESTS
+### ============================================
+
+### ADMIN: Delete entire team/group (should remove team and ALL associated files from GCS and DB)
+DELETE {{wspolpracujmy_HostAddress}}/api/groups/1
+Authorization: Bearer {{admin_token}}
+
+###
+
+### STUDENT 1: Try to download after team was deleted (should return 404)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{student1_token}}
+
+###
+
+### STUDENT 2 Leader: Delete their own team (should succeed and cleanup all files)
+DELETE {{wspolpracujmy_HostAddress}}/api/groups/2
+Authorization: Bearer {{student2_token}}
+
+###
+
+### Admin: Verify all files from team 2 are gone
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440002
+Authorization: Bearer {{admin_token}}
+### COMPANY 1: Download team 2 file (should succeed only if team 2 is assigned to company1's project)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440002
+Authorization: Bearer {{company1_token}}
+
+###
+
+### ============================================
+
+### COMPANY 2: Login and get token
+POST {{wspolpracujmy_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "company2_admin",
+  "password": "CompanyPass456!"
+}
+
+@company2_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0IiwibmFtZSI6ImNvbXBhbnkyX2FkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.placeholder
+
+###
+
+### COMPANY 2: Download file from student 1 (should succeed only if student 1's team is assigned to company2's project)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{company2_token}}
+
+###
+### COMPANY 3: Upload file to team 2 (should succeed if team 2 is assigned to company3's project, must provide ?teamId=2)
+POST {{wspolpracujmy_HostAddress}}/api/files/upload?teamId=2
+Authorization: Bearer {{company3_token}}
+Content-Type: multipart/form-data; boundary=----Company3Upload
+
+------Company3Upload
+Content-Disposition: form-data; name="file"; filename="company3_specyfikacja.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/company3_specyfikacja.pdf
+------Company3Upload--
+
+###
+
+### COMPANY 3: Delete file from team 2 (should succeed only if team 2 is assigned to company3's project)
+DELETE {{wspolpracujmy_HostAddress}}/api/files/550e8400-e29b-41d4-a716-446655440002
+Authorization: Bearer {{company3_token}}
+### COMPANY 2: Upload file to team 1 (should succeed if team 1 is assigned to company2's project, must provide ?teamId=1)
+POST {{wspolpracujmy_HostAddress}}/api/files/upload?teamId=1
+Authorization: Bearer {{company2_token}}
+Content-Type: multipart/form-data; boundary=----Company2Upload
+
+------Company2Upload
+Content-Disposition: form-data; name="file"; filename="company2_wytyczne.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/company2_wytyczne.pdf
+------Company2Upload--
+
+###
+
+### COMPANY 2: Delete file from team 1 (should succeed only if team 1 is assigned to company2's project)
+DELETE {{wspolpracujmy_HostAddress}}/api/files/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{company2_token}}
+
+### ============================================
+
+### COMPANY 3: Login and get token
+POST {{wspolpracujmy_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "company3_admin",
+  "password": "CompanyPass789!"
+}
+
+@company3_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1IiwibmFtZSI6ImNvbXBhbnkzX2FkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.placeholder
+
+###
+
+### ============================================
+
+### ADMIN: Login and get token
+POST {{wspolpracujmy_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "AdminPass123!"
+}
+
+@admin_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MjAiLCJuYW1lIjoiYWRtaW4iLCJpYXQiOjE1MTYyMzkwMjJ9.placeholder
+
+###
+
+### ADMIN: Download student 1 file (should always succeed - admin has access to everything)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{admin_token}}
+
+###
+
+### ADMIN: Download student 2 file (should always succeed - admin has access to everything)
+GET {{wspolpracujmy_HostAddress}}/api/files/download/550e8400-e29b-41d4-a716-446655440002
+Authorization: Bearer {{admin_token}}
+
+###
+
+### ADMIN: Upload file to team 1 (must provide ?teamId=1)
+POST {{wspolpracujmy_HostAddress}}/api/files/upload?teamId=1
+Authorization: Bearer {{admin_token}}
+Content-Type: multipart/form-data; boundary=----AdminUpload
+
+------AdminUpload
+Content-Disposition: form-data; name="file"; filename="admin_materialy.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/admin_materialy.pdf
+------AdminUpload--
+
+###
+
+### ADMIN: Upload file to team 2 (must provide ?teamId=2)
+POST {{wspolpracujmy_HostAddress}}/api/files/upload?teamId=2
+Authorization: Bearer {{admin_token}}
+Content-Type: multipart/form-data; boundary=----AdminUpload2
+
+------AdminUpload2
+Content-Disposition: form-data; name="file"; filename="admin_zasoby.pdf"
+Content-Type: application/pdf
+
+< ./sample_files/admin_zasoby.pdf
+------AdminUpload2--
+
+###
+
+### ============================================
+### FILE DELETION TESTS
+### ============================================
+
+### STUDENT 1: Delete own file (should succeed)
+DELETE {{wspolpracujmy_HostAddress}}/api/files/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{student1_token}}
+
+###
+
+### STUDENT 2: Try to delete student 1's file (should be forbidden - different team)
+DELETE {{wspolpracujmy_HostAddress}}/api/files/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {{student2_token}}
+
+###
+
+### ADMIN: Delete any file (should always succeed)
+DELETE {{wspolpracujmy_HostAddress}}/api/files/550e8400-e29b-41d4-a716-446655440002
+Authorization: Bearer {{admin_token}}

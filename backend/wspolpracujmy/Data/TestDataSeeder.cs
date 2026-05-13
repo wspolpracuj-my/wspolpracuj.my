@@ -10,8 +10,14 @@ using BCrypt.Net;
 
 namespace wspolpracujmy.Data
 {
+    /// <summary>
+    /// Seeder przygotowujący przykładowe dane testowe dla środowiska developerskiego.
+    /// </summary>
     public static class TestDataSeeder
     {
+        /// <summary>
+        /// Wypełnia bazę danych zestawem danych testowych.
+        /// </summary>
         public static async Task SeedAsync(WebApplication app)
         {
             using var scope = app.Services.CreateScope();

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace wspolpracujmy.Migrations
 {
     /// <inheritdoc />
+    [Migration("20260506153000_AddGroupRequestRelationsAndOptionalGroupProject")]
     public partial class AddGroupRequestRelationsAndOptionalGroupProject : Migration
     {
         /// <inheritdoc />

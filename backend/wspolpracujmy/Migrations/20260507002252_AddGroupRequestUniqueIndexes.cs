@@ -14,7 +14,14 @@ namespace wspolpracujmy.Migrations
 
             migrationBuilder.Sql("CREATE UNIQUE INDEX IF NOT EXISTS ux_group_application_pending\n  ON \"GroupRequests\"(group_id, student_id)\n  WHERE type = 'Application' AND status = 'Pending';");
 
-            migrationBuilder.Sql("CREATE UNIQUE INDEX IF NOT EXISTS ux_group_projectreq_pending\n  ON \"GroupRequests\"(group_id, project_id)\n  WHERE type = 'ProjectRequest' AND status = 'Pending' AND project_id IS NOT NULL;");
+                                        migrationBuilder.Sql(@"DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GroupRequests' AND column_name = 'project_id') THEN
+                        CREATE UNIQUE INDEX IF NOT EXISTS ux_group_projectreq_pending
+                            ON ""GroupRequests""(group_id, project_id)
+                            WHERE type = 'ProjectRequest' AND status = 'Pending' AND project_id IS NOT NULL;
+                    END IF;
+                END$$;");
 
         }
 
