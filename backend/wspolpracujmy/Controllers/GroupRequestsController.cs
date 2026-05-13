@@ -321,7 +321,8 @@ namespace wspolpracujmy.Controllers
             {
                 // only company owner (of the project) or admin can respond
                 if (!req.ProjectId.HasValue) return BadRequest("Brak powiązanego projektu dla tej prośby.");
-                var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == req.ProjectId.Value);
+                var projectId = req.ProjectId.Value;
+                var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
                 if (project == null) return NotFound("Powiązany projekt nie został znaleziony.");
                 if (!isAdmin)
                 {
