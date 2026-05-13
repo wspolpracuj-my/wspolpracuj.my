@@ -299,11 +299,23 @@ namespace wspolpracujmy.Controllers
 
                         _db.Notifications.Add(notification);
                     }
+
+                    private static bool IsFatalException(System.Exception ex)
+                    {
+                        return ex is System.OutOfMemoryException
+                            || ex is System.StackOverflowException
+                            || ex is System.AccessViolationException
+                            || ex is System.AppDomainUnloadedException
+                            || ex is System.BadImageFormatException
+                            || ex is System.CannotUnloadAppDomainException
+                            || ex is System.InvalidProgramException
+                            || ex is System.Threading.ThreadAbortException;
+                    }
                 }
             }
-            catch
+            catch (System.Exception ex) when (!IsFatalException(ex))
             {
-                // Swallow notification errors so comment creation still succeeds
+                // Swallow non-fatal notification errors so comment creation still succeeds
             }
 
             await _db.SaveChangesAsync();
