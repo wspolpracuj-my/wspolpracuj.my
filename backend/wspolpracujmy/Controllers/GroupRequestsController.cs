@@ -215,7 +215,8 @@ namespace wspolpracujmy.Controllers
                     // notify leader
                     if (group.LeaderId.HasValue)
                     {
-                        var leader = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == group.LeaderId.Value);
+                        var leaderId = group.LeaderId.Value;
+                        var leader = await _db.Students.Include(s => s.User).FirstOrDefaultAsync(s => s.Id == leaderId);
                         if (leader != null)
                         {
                             var requesterName = creatorStudent?.User != null ? $"{creatorStudent.User.Name} {creatorStudent.User.Surname}" : creatorUser.Name + " " + creatorUser.Surname;
