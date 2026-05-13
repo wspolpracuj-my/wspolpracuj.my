@@ -365,7 +365,7 @@ namespace wspolpracujmy.Controllers
             {
                 if (targetStudent != null)
                 {
-                    var project = group?.Project ?? (group?.ProjectId.HasValue == true ? await _db.Projects.FindAsync(group.ProjectId.Value) : null);
+                    var project = group?.Project ?? (group?.ProjectId.HasValue == true ? await _db.Projects.FindAsync(group?.ProjectId?.Value) : null);
                     var currentMembers = group?.Members?.Count ?? (await _db.Students.CountAsync(s => s.GroupId == req.GroupId));
                     if (project != null && currentMembers >= project.MaxNumberGroupMembers) return BadRequest($"Grupa ma już {currentMembers} członków, co przekracza maksymalny limit projektu ({project.MaxNumberGroupMembers}).");
 
