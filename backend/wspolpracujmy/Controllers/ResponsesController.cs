@@ -72,13 +72,6 @@ namespace wspolpracujmy.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-<<<<<<< HEAD
-            int currentUserId = GetCurrentUserId();
-            if (dto.UserId != currentUserId) return Forbid("Cannot respond as another user");
-
-            var comment = await _db.Comments.Include(c => c.Project).FirstOrDefaultAsync(c => c.Id == dto.CommentId);
-            if (comment == null) return NotFound($"Comment with id {dto.CommentId} not found.");
-=======
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
                          ?? User?.FindFirst("sub")?.Value;
@@ -90,7 +83,6 @@ namespace wspolpracujmy.Controllers
 
             var comment = await _db.Comments.FindAsync(dto.CommentId);
             if (comment == null) return NotFound($"Komentarz o id {dto.CommentId} nie został znaleziony.");
->>>>>>> origin/StudentsApi+AuthByRole
 
             if (!await CanAccessProjectAsync(comment.ProjectId, currentUserId)) return Forbid("No access to this project");
 

@@ -457,6 +457,18 @@ namespace wspolpracujmy.Migrations
                 name: "FK_Students_Groups_group_id",
                 table: "Students");
 
+            migrationBuilder.DropForeignKey(
+                name: "FK_CalendarEvents_Groups_group_id",
+                table: "CalendarEvents");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_GroupFiles_Groups_group_id",
+                table: "GroupFiles");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_Groups_Students_leader_id",
+                table: "Groups");
+
             migrationBuilder.DropTable(
                 name: "CalendarEvents");
 

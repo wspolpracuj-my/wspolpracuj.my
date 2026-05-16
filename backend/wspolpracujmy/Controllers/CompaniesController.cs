@@ -139,7 +139,6 @@ namespace wspolpracujmy.Controllers
             // only admin or company owner can update
             if (!isAdmin && company.UserId != currentUserId) return Forbid();
 
-            int currentUserId = GetCurrentUserId();
             if (!await CanManageCompanyAsync(id, currentUserId) && !IsAdmin())
                 return Forbid("No permission to update this company");
 
@@ -168,11 +167,6 @@ namespace wspolpracujmy.Controllers
             var c = await _db.Companies.FindAsync(id);
             if (c == null) return NotFound();
 
-<<<<<<< HEAD
-            int currentUserId = GetCurrentUserId();
-            if (!await CanManageCompanyAsync(id, currentUserId) && !IsAdmin())
-                return Forbid("No permission to delete this company");
-=======
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
                          ?? User?.FindFirst("sub")?.Value;
@@ -182,7 +176,6 @@ namespace wspolpracujmy.Controllers
 
             var isAdmin = currentUser.Role == Role.Admin;
             if (!isAdmin && c.UserId != currentUserId) return Forbid();
->>>>>>> origin/StudentsApi+AuthByRole
 
             _db.Companies.Remove(c);
             await _db.SaveChangesAsync();

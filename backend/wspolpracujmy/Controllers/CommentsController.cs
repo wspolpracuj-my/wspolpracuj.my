@@ -169,18 +169,6 @@ namespace wspolpracujmy.Controllers
 
                         _db.Notifications.Add(notification);
                     }
-
-                    private static bool IsFatalException(System.Exception ex)
-                    {
-                        return ex is System.OutOfMemoryException
-                            || ex is System.StackOverflowException
-                            || ex is System.AccessViolationException
-                            || ex is System.AppDomainUnloadedException
-                            || ex is System.BadImageFormatException
-                            || ex is System.CannotUnloadAppDomainException
-                            || ex is System.InvalidProgramException
-                            || ex is System.Threading.ThreadAbortException;
-                    }
                 }
             }
             catch (System.Exception ex) when (!IsFatalException(ex))
@@ -303,6 +291,18 @@ namespace wspolpracujmy.Controllers
             if (student?.Group?.ProjectId == projectId) return true;
 
             return false;
+        }
+
+        private static bool IsFatalException(System.Exception ex)
+        {
+            return ex is System.OutOfMemoryException
+                || ex is System.StackOverflowException
+                || ex is System.AccessViolationException
+                || ex is System.AppDomainUnloadedException
+                || ex is System.BadImageFormatException
+                || ex is System.CannotUnloadAppDomainException
+                || ex is System.InvalidProgramException
+                || ex is System.Threading.ThreadAbortException;
         }
     }
 }

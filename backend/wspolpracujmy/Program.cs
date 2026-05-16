@@ -111,8 +111,8 @@ if (app.Environment.IsDevelopment())
 }
 app.UseCors(AllowFrontend);
 
-app.UseAuthorization();
 app.UseAuthentication();
+app.UseAuthorization();
 
 
 app.MapControllers();

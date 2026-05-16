@@ -364,7 +364,7 @@ namespace wspolpracujmy.Controllers
 
             if (action == "accept" && req.Type != null && (req.Type.Equals("invite", StringComparison.OrdinalIgnoreCase) || req.Type.Equals("invitation", StringComparison.OrdinalIgnoreCase)) && targetStudent != null)
             {
-                var project = group?.Project ?? (group?.ProjectId.HasValue == true ? await _db.Projects.FindAsync(group?.ProjectId?.Value) : null);
+                var project = group?.Project ?? (group != null && group.ProjectId.HasValue ? await _db.Projects.FindAsync(group.ProjectId.Value) : null);
                 var currentMembers = group?.Members?.Count ?? (await _db.Students.CountAsync(s => s.GroupId == req.GroupId));
                 if (project != null && currentMembers >= project.MaxNumberGroupMembers) return BadRequest($"Grupa ma już {currentMembers} członków, co przekracza maksymalny limit projektu ({project.MaxNumberGroupMembers}).");
 
@@ -434,8 +434,9 @@ namespace wspolpracujmy.Controllers
                             var members = await _db.Students.Where(s => s.GroupId == group.Id).ToListAsync();
                             foreach (var m in members)
                             {
-                                var content = action == "accept" ? $"Zespół {group.Name} został przyjęty do projektu {project.Topic}." : $"Zespół {group.Name} nie został przyjęty do projektu {project.Topic}.";
-                                await _notifications.CreateNotificationAsync(m.UserId, content, $"project:{project.Id}");
+                                var projectName = project?.Topic ?? "projekt";
+                                var content = action == "accept" ? $"Zespół {group.Name} został przyjęty do projektu {projectName}." : $"Zespół {group.Name} nie został przyjęty do projektu {projectName}.";
+                                await _notifications.CreateNotificationAsync(m.UserId, content, $"project:{project?.Id}");
                             }
                         }
                     }
