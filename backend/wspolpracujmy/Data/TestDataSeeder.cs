@@ -31,34 +31,15 @@ namespace wspolpracujmy.Data
                 logger.LogWarning(ex, "Failed to run GroupRequests.status cleanup; continuing.");
             }
 
-            // avoid seeding when an admin already exists
-            if (await context.Users.AnyAsync(u => u.Role == Role.Admin))
+            // avoid seeding when data already present
+            if (await context.Users.AnyAsync())
             {
-                logger.LogInformation("Test seeder skipped: admin user already exists.");
+                logger.LogInformation("Test seeder skipped: Users already exist.");
                 return;
             }
 
             await context.Database.OpenConnectionAsync();
             await using var tx = await context.Database.BeginTransactionAsync();
-            
-            if (await context.Users.AnyAsync())
-            {
-                logger.LogInformation("Database contains users but no Admin account; seeding admin user only.");
-                var adminUser = new User
-                {
-                    Name = "Admin",
-                    Surname = "Admin",
-                    Role = Role.Admin,
-                    Login = "admin",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin")
-                };
-
-                await context.Users.AddAsync(adminUser);
-                await context.SaveChangesAsync();
-                await tx.CommitAsync();
-                logger.LogInformation("Admin user seeded into existing database.");
-                return;
-            }
 
             // defer constraints so we can insert circular/related rows in one transaction
             await context.Database.ExecuteSqlRawAsync("SET CONSTRAINTS ALL DEFERRED;");
@@ -74,8 +55,7 @@ namespace wspolpracujmy.Data
                 // Additional test users: one student without a group, and one company without projects
                 var u6 = new User { Id = 6, Name = "Student", Surname = "NoGroup", Role = Role.Student, Login = "student4", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student4") };
                 var u7 = new User { Id = 7, Name = "SoloCompany", Surname = "NoProject", Role = Role.Company, Login = "firma3", PasswordHash = BCrypt.Net.BCrypt.HashPassword("firma3") };
-                var u8 = new User { Id = 8, Name = "Admin", Surname = "Admin", Role = Role.Admin, Login = "admin", PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin") };
-                await context.Users.AddRangeAsync(u1, u2, u3, u4, u5, u6, u7, u8);
+                await context.Users.AddRangeAsync(u1, u2, u3, u4, u5, u6, u7);
 
                 // Companies
                 var c1 = new Company { Id = 1, UserId = 1, CompanyName = "Firma Innowacji", ContactEmail = "contact@firma1.example", User = u1 };

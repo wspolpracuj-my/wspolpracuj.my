@@ -34,7 +34,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę grup z liczbą członków (skrótowe dane).
         /// </summary>
@@ -48,7 +47,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("{id:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Pobiera grupę po jej identyfikatorze, włącznie z członkami.
         /// </summary>
@@ -62,35 +60,13 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("project/{projectId}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<ActionResult<IEnumerable<Group>>> GetByProjectId(int projectId)
         {
-            if (projectId <= 0) return BadRequest("Parametr projectId musi być większy niż 0.");
-
-            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
-            if (project == null) return NotFound();
-
-            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
-
-            var currentUser = await _db.Users.FindAsync(currentUserId);
-            if (currentUser == null) return Unauthorized();
-
-            if (currentUser.Role != Models.Role.Admin)
-            {
-                // company must be owner of project
-                if (currentUser.Role != Models.Role.Company) return Forbid();
-                if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
-            }
-
             var groups = await _db.Groups
                 .Include(g => g.Members)
                 .Where(g => g.ProjectId == projectId)
                 .ToListAsync();
-
-            return Ok(groups);
+            return groups;
         }
 
         [HttpPost]
@@ -290,7 +266,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpDelete("{groupId:int}/members/{studentId:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        [Authorize]
         /// <summary>
         /// Usuwa studenta z grupy. Tylko lider grupy lub administrator mogą wykonać tę akcję.
         /// </summary>
@@ -354,7 +330,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("project/{projectId:int}/summary")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca podsumowania grup (z członkami) dla zadanego projektu.
         /// </summary>
@@ -363,22 +338,9 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<List<GroupSummaryDto>>> GetByProjectSummary(int projectId)
         {
             if (projectId <= 0) return BadRequest("Parametr projectId musi być większy niż 0.");
-            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
-            if (project == null) return NotFound();
 
-            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
-
-            var currentUser = await _db.Users.FindAsync(currentUserId);
-            if (currentUser == null) return Unauthorized();
-
-            if (currentUser.Role != Models.Role.Admin)
-            {
-                if (currentUser.Role != Models.Role.Company) return Forbid();
-                if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
-            }
+            var exists = await _db.Projects.AnyAsync(p => p.Id == projectId);
+            if (!exists) return NotFound();
 
             var summaries = await _db.Groups
                 .Where(g => g.ProjectId == projectId)
@@ -390,8 +352,6 @@ namespace wspolpracujmy.Controllers
                     Name = g.Name,
                     LeaderId = g.LeaderId ?? 0,
                     MemberCount = g.Members.Count,
-                    ProjectId = g.ProjectId,
-                    ProjectTopic = g.Project != null ? g.Project.Topic : null,
                     Members = g.Members.Select(m => new MemberSummaryDto
                     {
                         Id = m.Id,
@@ -404,7 +364,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("{id:int}/summary")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca podsumowanie konkretnej grupy wraz z listą członków.
         /// </summary>
@@ -424,8 +383,6 @@ namespace wspolpracujmy.Controllers
                     Name = g.Name,
                     LeaderId = g.LeaderId ?? 0,
                     MemberCount = g.Members.Count,
-                    ProjectId = g.ProjectId,
-                    ProjectTopic = g.Project != null ? g.Project.Topic : null,
                     Members = g.Members.Select(m => new MemberSummaryDto
                     {
                         Id = m.Id,
@@ -438,54 +395,16 @@ namespace wspolpracujmy.Controllers
             return Ok(dto);
         }
 
-        [HttpGet("summary")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
-        /// <summary>
-        /// Zwraca wszystkie podsumowania grup z przypisanym projektem (jeśli jest) i listą członków. Dostęp tylko dla admina.
-        /// </summary>
-        public async Task<ActionResult<List<GroupSummaryDto>>> GetAllSummaries()
-        {
-            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
-            var currentUser = await _db.Users.FindAsync(currentUserId);
-            if (currentUser == null) return Unauthorized();
-
-            if (currentUser.Role != Models.Role.Admin) return Forbid();
-
-            var summaries = await _db.Groups
-                .Include(g => g.Project)
-                .Include(g => g.Members).ThenInclude(m => m.User)
-                .Select(g => new GroupSummaryDto
-                {
-                    Id = g.Id,
-                    Name = g.Name,
-                    LeaderId = g.LeaderId ?? 0,
-                    MemberCount = g.Members.Count,
-                    ProjectId = g.ProjectId,
-                    ProjectTopic = g.Project != null ? g.Project.Topic : null,
-                    Members = g.Members.Select(m => new MemberSummaryDto
-                    {
-                        Id = m.Id,
-                        UserName = m.User.Name + " " + m.User.Surname,
-                    }).ToList()
-                })
-                .ToListAsync();
-
-            return Ok(summaries);
-        }
-
         private int GetCurrentUserId()
         {
-            var claim = User?.FindFirst(ClaimTypes.NameIdentifier);
+            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
             if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
             return int.Parse(claim.Value);
         }
 
         private bool IsAdmin()
         {
-            var roleClaim = User?.FindFirst(ClaimTypes.Role);
+            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
             return roleClaim?.Value == "Admin";
         }
 
@@ -494,10 +413,15 @@ namespace wspolpracujmy.Controllers
             var group = await _db.Groups.Include(g => g.Project).ThenInclude(p => p!.Company).FirstOrDefaultAsync(g => g.Id == groupId);
             if (group == null) return false;
 
-            if (group.LeaderId == userId) return true;
+            // Company owner can manage groups in their projects
             if (group.Project?.Company?.UserId == userId) return true;
 
-            return await _db.Students.AnyAsync(s => s.GroupId == groupId && s.UserId == userId);
+            // Group leader can manage their group
+            if (group.LeaderId == userId) return true;
+
+            // Group members can view/manage their group (for some actions)
+            var isMember = await _db.Students.AnyAsync(s => s.GroupId == groupId && s.UserId == userId);
+            return isMember;
         }
     }
 }

@@ -116,9 +116,7 @@ document.querySelector("#login form").addEventListener("submit", async (e) => {
             localStorage.setItem("token", data.token);
             localStorage.setItem("user", JSON.stringify(data));
             
-            if (data.role === "Admin" || data.role === 0) {
-                window.location.href = "admin.html";
-            } else if (data.role === "Company" || data.role === 2) {
+            if (data.role === "Company" || data.role ===2) {
                 window.location.href = "firma.html";
             } else if (data.role === "Student" || data.role === 1) {
                 window.location.href = "student.html";
@@ -159,7 +157,6 @@ document.querySelector("#register form").addEventListener("submit", async (e) =>
             localStorage.setItem("token", result.token);
             localStorage.setItem("user", JSON.stringify(result));
             window.location.href = "index.html";
-
         } else {
             alert(result.message || "Błąd rejestracji");
         }

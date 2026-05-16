@@ -68,7 +68,7 @@ namespace wspolpracujmy.Controllers
                 Surname = request.Surname,
                 Login = request.Login,
                 PasswordHash = passwordHash,
-                Role = request.Role
+                Role = Role.Student
             };
 
             _context.Users.Add(user);

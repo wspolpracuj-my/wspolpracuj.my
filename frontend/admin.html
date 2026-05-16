@@ -325,7 +325,6 @@
 <script>
 let currentProjectId = null;
 let currentTeamId = null;
-let currentProjectDetails = null;
 
 let deleteData = {
     type: null,
@@ -335,9 +334,7 @@ let deleteData = {
 
 const viewHistory = [];
 
-const API_BASE = "http://localhost:8081/api";
-const authToken = localStorage.getItem("token");
-const currentUser = safeParseJson(localStorage.getItem("user"));
+/* PUSTE DANE — tutaj później możesz podpiąć backend albo bazę danych */
 
 let students = [];
 
@@ -361,155 +358,12 @@ const priorityLabels = {
     5: "5 - bardzo wysoki"
 };
 
-function safeParseJson(value) {
-    try {
-        return JSON.parse(value);
-    } catch {
-        return null;
-    }
-}
-
-function buildHeaders(json = true) {
-    const headers = {};
-    if (json) {
-        headers["Content-Type"] = "application/json";
-    }
-    if (authToken) {
-        headers["Authorization"] = `Bearer ${authToken}`;
-    }
-    return headers;
-}
-
-function isAdminUser() {
-    if (!currentUser) {
-        return false;
-    }
-
-    if (typeof currentUser.role === "string") {
-        return currentUser.role.toLowerCase() === "admin";
-    }
-
-    return currentUser.role === 0 || currentUser.role === "0";
-}
-
-function ensureAdmin() {
-    if (!authToken || !currentUser || !isAdminUser()) {
-        window.location.href = "index.html";
-        return false;
-    }
-
-    const avatar = document.querySelector(".user-avatar");
-    const name = document.querySelector(".user-name");
-    const userName = [currentUser.name, currentUser.surname].filter(Boolean).join(" ");
-
-    if (avatar) {
-        avatar.textContent = (currentUser.name || "A")[0]?.toUpperCase() || "A";
-    }
-
-    if (name) {
-        name.textContent = userName || "Admin";
-    }
-
-    return true;
-}
-
-async function apiGet(path) {
-    const response = await fetch(`${API_BASE}${path}`, {
-        headers: buildHeaders()
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || response.statusText);
-    }
-
-    return response.json();
-}
-
-async function loadStudents() {
-    const data = await apiGet("/users/students");
-    students = data.map(student => ({
-        id: student.studentId,
-        userId: student.userId,
-        fullName: `${student.name || ""} ${student.surname || ""}`.trim(),
-        details: `ID użytkownika: ${student.userId}`
-    }));
-}
-
-async function loadCompanies() {
-    const data = await apiGet("/companies");
-    companies = data.map(company => ({
-        id: company.id,
-        name: company.companyName,
-        contactEmail: company.contactEmail || "Brak kontaktu"
-    }));
-}
-
-async function loadProjects() {
-    const data = await apiGet("/projects");
-    projects = data.map(project => ({
-        id: project.id,
-        topic: project.topic,
-        companyName: project.companyName,
-        currentGroupsCount: project.currentGroupsCount,
-        maxGroups: project.maxGroups
-    }));
-}
-
-async function loadTeams() {
-    const data = await apiGet("/groups");
-    teams = data.map(team => ({
-        id: team.id,
-        name: team.name,
-        projectId: team.projectId,
-        status: team.isAccepted === true ? "accepted" : team.isAccepted === false ? "rejected" : "pending",
-        members: [],
-        memberCount: team.memberCount || 0
-    }));
-}
-
-async function loadNotifications() {
-    const data = await apiGet("/notifications/all");
-    notifications = data.map(notification => ({
-        id: notification.id,
-        title: notification.userName || `Użytkownik ${notification.userId}`,
-        text: notification.content || "",
-        date: notification.createdAt ? new Date(notification.createdAt).toLocaleString("pl-PL") : ""
-    }));
-}
-
-async function loadInitialData() {
-    if (!ensureAdmin()) {
-        return;
-    }
-
-    try {
-        await Promise.all([
-            loadStudents(),
-            loadCompanies(),
-            loadProjects(),
-            loadTeams(),
-            loadNotifications()
-        ]);
-
-        renderStudents();
-        renderTeams();
-        renderCompanies();
-        renderProjects();
-        renderNotifications();
-    } catch (error) {
-        console.error("Błąd ładowania danych:", error);
-        const dashboard = document.getElementById("dashboard");
-        if (dashboard) {
-            dashboard.innerHTML = `
-                <div class="admin-start-box">
-                    <p class="small-label">Błąd</p>
-                    <h1>Nie udało się załadować danych</h1>
-                    <p class="muted">${escapeHtml(error.message)}</p>
-                </div>
-            `;
-        }
-    }
+function loadInitialData() {
+    renderStudents();
+    renderTeams();
+    renderCompanies();
+    renderProjects();
+    renderNotifications();
 }
 
 function showView(viewId, saveHistory = true) {
@@ -567,8 +421,6 @@ document.addEventListener("click", function(event) {
 });
 
 function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
     window.location.href = "index.html";
 }
 
@@ -613,7 +465,7 @@ function renderStudents() {
         item.innerHTML = `
             <div class="list-main">
                 <strong>${index + 1}. ${escapeHtml(student.fullName)}</strong>
-                <span>${escapeHtml(student.details)}</span>
+                <span>${escapeHtml(student.email)}</span>
             </div>
 
             <button class="danger-small" onclick="openDelete('student', ${student.id}, 'students')">Usuń studenta</button>
@@ -639,7 +491,7 @@ function renderCompanies() {
         item.innerHTML = `
             <div class="list-main">
                 <strong>${index + 1}. ${escapeHtml(company.name)}</strong>
-                <span>${escapeHtml(company.contactEmail)}</span>
+                <span>Login: ${escapeHtml(company.login)}</span>
             </div>
 
             <button class="danger-small" onclick="openDelete('company', ${company.id}, 'companies')">Usuń firmę</button>
@@ -666,9 +518,9 @@ function renderProjects() {
             <button class="project-card" onclick="showProjectDetails(${project.id})">
                 <div>
                     <strong>${index + 1}. ${escapeHtml(project.topic)}</strong>
-                    <span>${escapeHtml(project.companyName)}</span>
+                    <span>${escapeHtml(project.companyName)} · ${formatArray(project.tags)}</span>
                 </div>
-                <p>${project.currentGroupsCount || 0}/${project.maxGroups || 0}</p>
+                <p>${project.acceptedTeams || 0}/${project.teamSlots || 0}</p>
             </button>
 
             <button class="danger-small" onclick="openDelete('project', ${project.id}, 'projects')">Usuń projekt</button>
@@ -720,11 +572,7 @@ function renderNotifications() {
     notifications.forEach(notification => {
         const item = document.createElement("div");
         item.className = "notification-item";
-        item.innerHTML = `
-            <strong>${escapeHtml(notification.title)}</strong>
-            <p>${escapeHtml(notification.text)}</p>
-            <span class="notification-date">${escapeHtml(notification.date)}</span>
-        `;
+        item.textContent = notification.text || "";
 
         list.appendChild(item);
     });
@@ -740,7 +588,7 @@ function showAddCompany() {
     showView("addCompany");
 }
 
-async function addCompany(event) {
+function addCompany(event) {
     event.preventDefault();
 
     const name = document.getElementById("newCompanyName").value.trim();
@@ -761,58 +609,34 @@ async function addCompany(event) {
         return;
     }
 
-    const companyExists = companies.some(company => {
-        return company.name.toLowerCase() === name.toLowerCase();
+    const loginExists = companies.some(company => {
+        return company.login.toLowerCase() === login.toLowerCase();
     });
 
-    if (companyExists) {
-        message.textContent = "Nie dodano firmy. Firma o tej samej nazwie już istnieje.";
+    if (loginExists) {
+        message.textContent = "Nie dodano firmy. Podany login jest już zajęty.";
         message.className = "form-message error";
         return;
     }
 
-    try {
-        const response = await fetch(`${API_BASE}/companies/admin/create-company-account`, {
-            method: "POST",
-            headers: buildHeaders(),
-            body: JSON.stringify({
-                name: name,
-                surname: "Firma",
-                login: login,
-                password: password,
-                passwordConfirm: repeatPassword,
-                companyName: name,
-                contactEmail: null
-            })
-        });
+    companies.unshift({
+        id: Date.now(),
+        name: name,
+        login: login
+    });
 
-        const result = await response.json();
+    notifications.unshift({
+        id: Date.now(),
+        text: `Administrator dodał nową firmę ${name}.`
+    });
 
-        if (!response.ok) {
-            throw new Error(result.message || JSON.stringify(result) || "Błąd dodawania firmy.");
-        }
+    renderCompanies();
+    renderNotifications();
 
-        await loadCompanies();
+    event.target.reset();
 
-        notifications.unshift({
-            id: Date.now(),
-            title: "Nowe konto firmy",
-            text: `Administrator dodał nową firmę ${name}.`
-        });
-
-        renderCompanies();
-        renderNotifications();
-
-        event.target.reset();
-        message.textContent = "Firma została dodana.";
-        message.className = "form-message success";
-
-        removeDeleteConfirmFromHistory();
-        showView("companies", false);
-    } catch (error) {
-        message.textContent = error.message || "Błąd dodawania firmy.";
-        message.className = "form-message error";
-    }
+    removeDeleteConfirmFromHistory();
+    showView("companies", false);
 }
 
 function openDelete(type, id, returnView) {
@@ -885,8 +709,8 @@ function confirmDelete() {
         if (team && team.status === "accepted") {
             const project = projects.find(item => item.id === team.projectId);
 
-            if (project && project.currentGroupsCount > 0) {
-                project.currentGroupsCount -= 1;
+            if (project && project.acceptedTeams > 0) {
+                project.acceptedTeams -= 1;
             }
         }
 
@@ -936,77 +760,47 @@ function removeDeleteConfirmFromHistory() {
     }
 }
 
-async function showProjectDetails(projectId) {
+function showProjectDetails(projectId) {
     currentProjectId = projectId;
-    const summary = projects.find(item => item.id === projectId);
 
-    if (!summary) {
+    const project = projects.find(item => item.id === projectId);
+
+    if (!project) {
         return;
     }
 
-    try {
-        currentProjectDetails = await apiGet(`/projects/${projectId}/details`);
-    } catch (error) {
-        console.error("Błąd pobierania szczegółów projektu:", error);
-        currentProjectDetails = null;
-    }
-
-    document.getElementById("projectDetailsTitle").textContent = summary.topic || "";
+    document.getElementById("projectDetailsTitle").textContent = project.topic || "";
     document.getElementById("projectDetailsInfo").textContent =
-        `${summary.companyName || ""} · ${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
+        `${project.companyName || ""} · ${project.acceptedTeams || 0}/${project.teamSlots || 0}`;
 
-    document.getElementById("projectDetailsDescription").textContent = currentProjectDetails?.neededTechnologies || "";
-    document.getElementById("projectDetailsGoal").textContent = currentProjectDetails?.projectGoal || "";
-    document.getElementById("projectDetailsWorkScope").textContent = currentProjectDetails?.workScope || "";
-    document.getElementById("projectDetailsTechResources").textContent = currentProjectDetails?.neededTechnologies || "";
-    document.getElementById("projectDetailsCompany").textContent = currentProjectDetails?.companyName || summary.companyName || "";
-    document.getElementById("projectDetailsTeams").textContent =
-        `${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
-    document.getElementById("projectDetailsPriority").textContent =
-        priorityLabels[currentProjectDetails?.priority] || (currentProjectDetails?.priority ? String(currentProjectDetails.priority) : "");
+    document.getElementById("projectDetailsDescription").textContent = project.description || "";
+    document.getElementById("projectDetailsGoal").textContent = project.goal || "";
+    document.getElementById("projectDetailsWorkScope").textContent = project.workScope || "";
+    document.getElementById("projectDetailsTechResources").textContent = project.techResources || "";
+    document.getElementById("projectDetailsCompany").textContent = project.companyName || "";
+    document.getElementById("projectDetailsTeams").textContent = `${project.acceptedTeams || 0}/${project.teamSlots || 0}`;
+    document.getElementById("projectDetailsPriority").textContent = priorityLabels[project.priority] || "";
 
     showView("projectDetails");
 }
 
-async function showProjectComments() {
+function showProjectComments() {
     const list = document.getElementById("projectCommentsList");
+    const projectComments = comments.filter(comment => comment.projectId === currentProjectId);
+
     list.innerHTML = "";
 
-    if (!currentProjectId) {
-        list.innerHTML = "<p class='empty-state'>Wybierz projekt, aby zobaczyć komentarze.</p>";
-        showView("projectComments");
-        return;
-    }
-
-    try {
-        comments = await apiGet(`/comments/project/${currentProjectId}`);
-    } catch (error) {
-        console.error("Błąd pobierania komentarzy:", error);
-        comments = [];
-    }
-
-    if (comments.length === 0) {
+    if (projectComments.length === 0) {
         list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
     } else {
-        comments.forEach(comment => {
+        projectComments.forEach(comment => {
             const item = document.createElement("div");
             item.className = "comment-item";
 
             item.innerHTML = `
-                <strong>${escapeHtml(comment.userName || `Użytkownik ${comment.userId}`)}</strong>
-                <p>${escapeHtml(comment.content || comment.comment || "")}</p>
+                <strong>${escapeHtml(comment.authorName || "")}</strong>
+                <p>${escapeHtml(comment.text || "")}</p>
             `;
-
-            if (comment.responses && comment.responses.length > 0) {
-                const responsesHtml = comment.responses.map(response => `
-                    <div class="comment-response">
-                        <strong>${escapeHtml(response.userName || `Użytkownik ${response.userId}`)}</strong>
-                        <p>${escapeHtml(response.content || "")}</p>
-                    </div>
-                `).join("");
-
-                item.innerHTML += `<div class="comment-responses">${responsesHtml}</div>`;
-            }
 
             list.appendChild(item);
         });
@@ -1016,29 +810,20 @@ async function showProjectComments() {
 }
 
 function showProjectGuidelines() {
-    const summary = projects.find(item => item.id === currentProjectId);
+    const project = projects.find(item => item.id === currentProjectId);
 
-    if (!summary && !currentProjectDetails) {
+    if (!project) {
         return;
     }
 
-    const details = currentProjectDetails || {
-        topic: summary?.topic,
-        companyName: summary?.companyName,
-        projectGoal: "",
-        workScope: "",
-        neededTechnologies: "",
-        tags: []
-    };
+    document.getElementById("guidelinesTopic").textContent = project.topic || "";
+    document.getElementById("guidelinesCompany").textContent = project.companyName || "";
+    document.getElementById("guidelinesDescription").textContent = project.description || "";
+    document.getElementById("guidelinesGoal").textContent = project.goal || "";
+    document.getElementById("guidelinesWorkScope").textContent = project.workScope || "";
+    document.getElementById("guidelinesTechResources").textContent = project.techResources || "";
 
-    document.getElementById("guidelinesTopic").textContent = details.topic || "";
-    document.getElementById("guidelinesCompany").textContent = details.companyName || "";
-    document.getElementById("guidelinesDescription").textContent = details.neededTechnologies || "";
-    document.getElementById("guidelinesGoal").textContent = details.projectGoal || "";
-    document.getElementById("guidelinesWorkScope").textContent = details.workScope || "";
-    document.getElementById("guidelinesTechResources").textContent = details.neededTechnologies || "";
-
-    renderGuidelineTags(details.tags || []);
+    renderGuidelineTags(project.tags || []);
 
     showView("projectGuidelines");
 }
@@ -1088,7 +873,7 @@ function showProjectTeams() {
     showView("projectTeams");
 }
 
-async function showTeamDetails(teamId) {
+function showTeamDetails(teamId) {
     currentTeamId = teamId;
 
     const team = teams.find(item => item.id === teamId);
@@ -1106,23 +891,12 @@ async function showTeamDetails(teamId) {
     const membersList = document.getElementById("teamDetailsMembers");
     membersList.innerHTML = "";
 
-    let members = team.members || [];
-    if (members.length === 0) {
-        try {
-            const response = await apiGet(`/groups/${teamId}`);
-            members = response.members || [];
-            team.members = members;
-        } catch (error) {
-            console.error("Błąd pobierania członków zespołu:", error);
-        }
-    }
-
-    if (!members || members.length === 0) {
+    if (!team.members || team.members.length === 0) {
         membersList.innerHTML = "<p class='empty-state'>Brak członków zespołu do wyświetlenia.</p>";
     } else {
-        members.forEach(member => {
+        team.members.forEach(member => {
             const li = document.createElement("li");
-            li.textContent = member.email || `Student #${member.id}`;
+            li.textContent = member.fullName || "";
             membersList.appendChild(li);
         });
     }

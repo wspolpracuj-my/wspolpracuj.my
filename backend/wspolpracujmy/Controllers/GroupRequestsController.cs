@@ -31,7 +31,7 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpPost]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        [Authorize]
         public async Task<ActionResult<GroupRequest>> Post([FromBody] CreateGroupRequestDto dto)
         {
             if (dto == null) return BadRequest();
@@ -470,7 +470,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("byUser/{userId:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<IActionResult> GetByUser(int userId)
         {
             var requests = await _db.GroupRequests
@@ -485,7 +484,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("byProject/{projectId:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<IActionResult> GetByProject(int projectId)
         {
             var requests = await _db.GroupRequests
@@ -500,7 +498,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("byStudent/{studentId:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<IActionResult> GetByStudent(int studentId)
         {
             var requests = await _db.GroupRequests
