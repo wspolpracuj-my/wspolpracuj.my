@@ -296,9 +296,6 @@ namespace wspolpracujmy.Controllers
             if (req == null) return NotFound();
 
             int currentUserId = GetCurrentUserId();
-            // Check if user can respond: company owner or group leader
-            if (req.Group?.Project?.Company?.UserId != currentUserId && req.Group?.LeaderId != currentUserId && !IsAdmin())
-                return Forbid("No permission to respond to this request");
 
             if (req.Status == GroupStatus.Accepted || req.Status == GroupStatus.Declined)
                 return BadRequest("Prośba została już rozpatrzona.");
@@ -330,6 +327,14 @@ namespace wspolpracujmy.Controllers
                 {
                     if (project.Company == null) return Forbid();
                     if (project.Company.UserId != currentUserId) return Forbid();
+                }
+
+                if (group != null)
+                {
+                    // Keep group state in sync with the project request decision.
+                    group.ProjectId = action == "accept" ? projectId : null;
+                    group.IsAccepted = action == "accept" ? GroupStatus.Accepted : GroupStatus.Declined;
+                    _db.Groups.Update(group);
                 }
             }
             else if (reqType == "invitation" || reqType == "invite" || reqType == "application")
@@ -553,7 +558,7 @@ namespace wspolpracujmy.Controllers
             var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
             return roleClaim?.Value == "Admin";
         }
-                private int GetCurrentUserId()
+        private int GetCurrentUserId()
         {
             var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
             if (claim == null) throw new UnauthorizedAccessException("User not authenticated");

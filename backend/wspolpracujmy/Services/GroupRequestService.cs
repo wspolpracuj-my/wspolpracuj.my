@@ -115,6 +115,12 @@ namespace wspolpracujmy.Services
 
                 _db.GroupRequests.Add(entity);
 
+                // As soon as ProjectRequest is created, reflect pending assignment on the group.
+                // This keeps group state consistent with the expected UX (project number + pending status visible immediately).
+                group.ProjectId = projectId;
+                group.IsAccepted = GroupStatus.Pending;
+                _db.Groups.Update(group);
+
                 // Notify company user if available
                 if (project.Company != null)
                 {
