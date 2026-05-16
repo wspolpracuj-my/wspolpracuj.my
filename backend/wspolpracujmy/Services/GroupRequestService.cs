@@ -86,7 +86,7 @@ namespace wspolpracujmy.Services
                             // Final fallback: delete notifications using exact content pattern used when creating project request
                             var contentsToRemove = oldRequests
                                 .Where(r => r.Project != null)
-                                .Select(r => $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {r.Project.Topic}")
+                                .Select(r => $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {r.Project!.Topic}")
                                 .Distinct()
                                 .ToList();
 

@@ -55,7 +55,7 @@ namespace wspolpracujmy.Controllers
                          ?? User?.FindFirst("sub")?.Value;
             if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
 
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+            var role = User?.FindFirst(ClaimTypes.Role)?.Value ?? User?.FindFirst("role")?.Value;
 
             // Admin has access to all comments
             if (role == "Admin")
@@ -145,7 +145,7 @@ namespace wspolpracujmy.Controllers
                          ?? User?.FindFirst("sub")?.Value;
             if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
 
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+            var role = User?.FindFirst(ClaimTypes.Role)?.Value ?? User?.FindFirst("role")?.Value;
 
             // Admin: see all comments
             if (role == "Admin")
@@ -299,18 +299,6 @@ namespace wspolpracujmy.Controllers
 
                         _db.Notifications.Add(notification);
                     }
-
-                    private static bool IsFatalException(System.Exception ex)
-                    {
-                        return ex is System.OutOfMemoryException
-                            || ex is System.StackOverflowException
-                            || ex is System.AccessViolationException
-                            || ex is System.AppDomainUnloadedException
-                            || ex is System.BadImageFormatException
-                            || ex is System.CannotUnloadAppDomainException
-                            || ex is System.InvalidProgramException
-                            || ex is System.Threading.ThreadAbortException;
-                    }
                 }
             }
             catch (System.Exception ex) when (!IsFatalException(ex))
@@ -410,15 +398,27 @@ namespace wspolpracujmy.Controllers
 
         private int GetCurrentUserId()
         {
-            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var claim = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
             if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
             return int.Parse(claim.Value);
         }
 
         private bool IsAdmin()
         {
-            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            var roleClaim = User?.FindFirst(System.Security.Claims.ClaimTypes.Role);
             return roleClaim?.Value == "Admin";
+        }
+
+        private static bool IsFatalException(System.Exception ex)
+        {
+            return ex is System.OutOfMemoryException
+                || ex is System.StackOverflowException
+                || ex is System.AccessViolationException
+                || ex is System.AppDomainUnloadedException
+                || ex is System.BadImageFormatException
+                || ex is System.CannotUnloadAppDomainException
+                || ex is System.InvalidProgramException
+                || ex is System.Threading.ThreadAbortException;
         }
 
         private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
@@ -426,7 +426,7 @@ namespace wspolpracujmy.Controllers
             // Check if user is the company owner
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
             if (project == null) return false;
-            if (project.Company.UserId == userId) return true;
+            if (project.Company != null && project.Company.UserId == userId) return true;
 
             // Check if user is a member of a group in the project
             var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
