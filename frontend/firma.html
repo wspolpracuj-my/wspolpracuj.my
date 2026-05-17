@@ -17,15 +17,34 @@
                 <p class="account-type">Panel firmy</p>
             </div>
 
+            <div class="user-menu">
+                <button class="user-menu-toggle" onclick="toggleUserMenu(event)" aria-expanded="false">
+                    <span class="user-avatar">F</span>
+
+                    <span class="user-info">
+                        <span class="user-name">Firma</span>
+                        <span class="user-role">Firma</span>
+                    </span>
+
+                    <span class="hamburger-icon" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </button>
+
+                <div id="userDropdown" class="user-dropdown">
+                    <button onclick="logout()">Wyloguj</button>
+                </div>
+            </div>
+        </header>
+
+        <section id="dashboard" class="view active-view">
             <div class="welcome-box">
                 <p class="small-label">Panel po zalogowaniu</p>
                 <h1>Cześć<span id="companyName"></span></h1>
             </div>
 
-            <button class="logout-btn" onclick="logout()">Wyloguj</button>
-        </header>
-
-        <section id="dashboard" class="view active-view">
             <div class="section-title-row">
                 <div>
                     <h2>Po zalogowaniu jako firma</h2>
@@ -41,13 +60,19 @@
 
             <div class="grid two-columns">
                 <div class="card">
-                    <h3>Twoje projekty</h3>
+                    <div class="card-title-row">
+                        <h3>Twoje projekty</h3>
+                        <button class="see-all-btn" onclick="showView('projects')">Zobacz wszystkie ›</button>
+                    </div>
                     <p class="muted">Ostatnie 3 projekty wystawione przez firmę.</p>
                     <div id="dashboardProjects" class="project-list compact-list"></div>
                 </div>
 
                 <div class="card">
-                    <h3>Powiadomienia</h3>
+                    <div class="card-title-row">
+                        <h3>Powiadomienia</h3>
+                        <button class="see-all-btn" onclick="showView('notifications')">Zobacz wszystkie ›</button>
+                    </div>
                     <p class="muted">Najnowsze powiadomienia dotyczące Twojej firmy.</p>
                     <div id="dashboardNotifications" class="notification-list"></div>
                 </div>
@@ -179,7 +204,6 @@
                         <option value="">Wybierz język dokumentacji</option>
                         <option value="Polski">Polski</option>
                         <option value="Angielski">Angielski</option>
-                        <option value="Inny">Inny</option>
                     </select>
                 </label>
 
@@ -557,7 +581,7 @@ const availableTags = [
     "Medycyna / HealthTech",
     "Finanse / FinTech",
     "Logistyka",
-    "Produkcja / przemysł",
+    "Produkcja / przemysł"
 ];
 
 const priorityLabels = {
@@ -570,16 +594,19 @@ const priorityLabels = {
 
 async function loadInitialData() {
     if (!checkAuth()) return;
-    
+
+    setUserMenuData();
+
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    
+
     try {
         const res = await fetch(`${API_BASE}/companies/user/${user.userId}`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             const company = await res.json();
+
             companyData = {
                 id: company.id,
                 name: company.companyName,
@@ -589,44 +616,146 @@ async function loadInitialData() {
     } catch (err) {
         console.error("Błąd pobierania danych firmy:", err);
     }
-    
-    // Load tags from backend
+
     try {
         const res = await fetch(`${API_BASE}/tags`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             const tags = await res.json();
+
             availableTags.length = 0;
             tags.forEach(tag => availableTags.push(tag.name));
         }
     } catch (err) {
         console.error("Błąd pobierania tagów:", err);
     }
-    
+
     setCompanyData(companyData);
+    setUserMenuData();
+
     renderTagOptions("newTags");
     renderTagOptions("editTags");
-    
+
     await Promise.all([
         loadProjects(),
         loadNotifications()
     ]);
 }
 
+function getCurrentUserName() {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (companyData.name) {
+        return companyData.name;
+    }
+
+    const fullName = [
+        user.name,
+        user.surname
+    ].filter(Boolean).join(" ").trim();
+
+    if (fullName) {
+        return fullName;
+    }
+
+    if (user.fullName) {
+        return user.fullName;
+    }
+
+    if (user.username) {
+        return user.username;
+    }
+
+    if (user.login) {
+        return user.login;
+    }
+
+    if (user.email) {
+        return user.email.split("@")[0];
+    }
+
+    return "Firma";
+}
+
+function getUserInitial(userName) {
+    const cleanName = String(userName || "Firma").trim();
+
+    if (!cleanName) {
+        return "F";
+    }
+
+    return cleanName[0].toUpperCase();
+}
+
+function setUserMenuData() {
+    const userName = getCurrentUserName();
+
+    const avatar = document.querySelector(".user-avatar");
+    const name = document.querySelector(".user-name");
+    const role = document.querySelector(".user-role");
+
+    if (avatar) {
+        avatar.textContent = getUserInitial(userName);
+    }
+
+    if (name) {
+        name.textContent = userName;
+    }
+
+    if (role) {
+        role.textContent = "Firma";
+    }
+}
+
+function toggleUserMenu(event) {
+    event.stopPropagation();
+
+    const menu = document.querySelector(".user-menu");
+    const toggle = document.querySelector(".user-menu-toggle");
+
+    if (!menu || !toggle) {
+        return;
+    }
+
+    menu.classList.toggle("open");
+
+    const isOpen = menu.classList.contains("open");
+    toggle.setAttribute("aria-expanded", isOpen);
+}
+
+document.addEventListener("click", function(event) {
+    const menu = document.querySelector(".user-menu");
+
+    if (!menu) {
+        return;
+    }
+
+    if (!menu.contains(event.target)) {
+        menu.classList.remove("open");
+
+        const toggle = document.querySelector(".user-menu-toggle");
+
+        if (toggle) {
+            toggle.setAttribute("aria-expanded", "false");
+        }
+    }
+});
+
 async function loadProjects() {
     try {
         const res = await fetch(`${API_BASE}/projects/company/${companyData.id}`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             projects = await res.json();
         }
     } catch (err) {
         console.error("Błąd pobierania projektów:", err);
     }
+
     renderProjects();
 }
 
@@ -635,13 +764,14 @@ async function loadTeamsForProject(projectId) {
         const res = await fetch(`${API_BASE}/groups/project/${projectId}`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             return await res.json();
         }
     } catch (err) {
         console.error("Błąd pobierania zespołów:", err);
     }
+
     return [];
 }
 
@@ -650,13 +780,14 @@ async function loadCommentsForProject(projectId) {
         const res = await fetch(`${API_BASE}/comments/project/${projectId}`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             return await res.json();
         }
     } catch (err) {
         console.error("Błąd pobierania komentarzy:", err);
     }
+
     return [];
 }
 
@@ -665,13 +796,14 @@ async function loadFilesForGroup(groupId) {
         const res = await fetch(`${API_BASE}/files/group/${groupId}`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             return await res.json();
         }
     } catch (err) {
         console.error("Błąd pobierania plików:", err);
     }
+
     return [];
 }
 
@@ -685,6 +817,7 @@ async function acceptTeamApi(teamId) {
             },
             body: JSON.stringify([{ "op": "replace", "path": "/IsAccepted", "value": true }])
         });
+
         return res.ok;
     } catch (err) {
         console.error("Błąd akceptacji zespołu:", err);
@@ -702,6 +835,7 @@ async function rejectTeamApi(teamId) {
             },
             body: JSON.stringify([{ "op": "replace", "path": "/IsAccepted", "value": false }])
         });
+
         return res.ok;
     } catch (err) {
         console.error("Błąd odrzucania zespołu:", err);
@@ -714,13 +848,14 @@ async function loadNotifications() {
         const res = await fetch(`${API_BASE}/notifications/company/${companyData.id}`, {
             headers: getAuthHeaders()
         });
-        
+
         if (res.ok) {
             notifications = await res.json();
         }
     } catch (err) {
         console.error("Błąd pobierania powiadomień:", err);
     }
+
     renderNotifications();
 }
 
@@ -730,11 +865,11 @@ async function saveProjectToBackend(projectData) {
         headers: getAuthHeaders(),
         body: JSON.stringify(projectData)
     });
-    
+
     if (!res.ok) {
         throw new Error("Błąd tworzenia projektu");
     }
-    
+
     return await res.json();
 }
 
@@ -744,11 +879,11 @@ async function updateProjectInBackend(projectData) {
         headers: getAuthHeaders(),
         body: JSON.stringify(projectData)
     });
-    
+
     if (!res.ok) {
         throw new Error("Błąd aktualizacji projektu");
     }
-    
+
     return await res.json();
 }
 
@@ -834,8 +969,8 @@ function createProjectCard(project) {
 
     card.innerHTML = `
         <div>
-            <strong>${escapeHtml(project.topic)}</strong>
-            <span>${project.tags || ""}</span>
+            <strong>${escapeHtml(project.topic || "")}</strong>
+            <span>${formatArray(project.tags || [])}</span>
         </div>
         <p>${acceptedTeams}/${teamSlots}</p>
     `;
@@ -868,7 +1003,7 @@ function renderNotifications() {
 function createNotification(notification) {
     const item = document.createElement("div");
     item.className = "notification-item";
-    item.textContent = notification.text || "";
+    item.textContent = notification.text || notification.content || "";
     return item;
 }
 
@@ -877,6 +1012,7 @@ function showCreateProject() {
     document.getElementById("newCompanyName").value = companyData.name || "";
     document.getElementById("newContactEmail").value = companyData.contactEmail || "";
     document.getElementById("newSubmissionDate").value = getTodayDate();
+
     showView("createProject");
 }
 
@@ -893,23 +1029,29 @@ async function createProject(event) {
         return;
     }
 
-    const savedProject = await saveProjectToBackend(projectData);
+    try {
+        const savedProject = await saveProjectToBackend(projectData);
 
-    projects.unshift({
-        ...savedProject,
-        id: savedProject.id || Date.now(),
-        acceptedTeams: savedProject.acceptedTeams || 0
-    });
+        projects.unshift({
+            ...savedProject,
+            id: savedProject.id || Date.now(),
+            acceptedTeams: savedProject.acceptedTeams || 0
+        });
 
-    event.target.reset();
+        event.target.reset();
 
-    clearSelectedOptions("newMeetingTypes");
-    clearSelectedOptions("newCooperationModes");
-    clearSelectedOptions("newDocumentationLanguages");
-    clearSelectedOptions("newTags");
+        clearSelectedOptions("newMeetingTypes");
+        clearSelectedOptions("newCooperationModes");
+        clearSelectedOptions("newDocumentationLanguages");
+        clearSelectedOptions("newTags");
 
-    renderProjects();
-    showView("dashboard");
+        renderProjects();
+        showView("dashboard");
+    } catch (error) {
+        const message = document.getElementById("createMessage");
+        message.textContent = error.message || "Błąd tworzenia projektu.";
+        message.className = "form-message error";
+    }
 }
 
 function collectProjectFormData(prefix) {
@@ -921,19 +1063,35 @@ function collectProjectFormData(prefix) {
     return {
         id: isEdit ? currentProjectId : null,
         companyId: companyData.id,
+        companyName: companyData.name,
+        contactEmail: getValue(`${prefix}ContactEmail`),
+        submissionDate: getValue(`${prefix}SubmissionDate`),
+
         topic: getValue(`${prefix}Topic`),
         description: getValue(`${prefix}Description`),
         projectGoal: getValue(`${prefix}Goal`),
+        goal: getValue(`${prefix}Goal`),
         workScope: getValue(`${prefix}WorkScope`),
         neededTechnologies: getValue(`${prefix}TechResources`),
+        techResources: getValue(`${prefix}TechResources`),
+
         createdAt: new Date().toISOString(),
         maxGroups: getNumber(`${prefix}TeamSlots`),
+        teamSlots: getNumber(`${prefix}TeamSlots`),
         minNumberGroupMembers: getNumber(`${prefix}MinMembers`),
         maxNumberGroupMembers: getNumber(`${prefix}MaxMembers`),
-        meetingTypeId: 1,
-        partnershipType: getSelectedOptions(`${prefix}CooperationModes`)[0] || "Zdalny",
-        documentationLanguage: getSelectedOptions(`${prefix}DocumentationLanguages`)[0] || "Polski",
+        minMembers: getNumber(`${prefix}MinMembers`),
+        maxMembers: getNumber(`${prefix}MaxMembers`),
+
+        meetingTypeId: getSelectedOptions(`${prefix}MeetingTypes`)[0] || "",
+        meetingTypes: getSelectedOptions(`${prefix}MeetingTypes`),
+        partnershipType: getSelectedOptions(`${prefix}CooperationModes`)[0] || "",
+        cooperationModes: getSelectedOptions(`${prefix}CooperationModes`),
+        documentationLanguage: getSelectedOptions(`${prefix}DocumentationLanguages`)[0] || "",
+        documentationLanguages: getSelectedOptions(`${prefix}DocumentationLanguages`),
+
         additionalNotes: getValue(`${prefix}AdditionalNotes`),
+        tags: getSelectedOptions(`${prefix}Tags`),
         priority: Number(document.getElementById(`${prefix}Priority`).value),
         status: "Open"
     };
@@ -944,14 +1102,14 @@ function validateProjectData(projectData) {
         !projectData.companyName ||
         !projectData.topic ||
         !projectData.description ||
-        !projectData.goal ||
+        !projectData.projectGoal ||
         !projectData.workScope ||
-        !projectData.techResources ||
+        !projectData.neededTechnologies ||
         !projectData.contactEmail ||
         !projectData.submissionDate ||
-        !projectData.teamSlots ||
-        !projectData.minMembers ||
-        !projectData.maxMembers ||
+        !projectData.maxGroups ||
+        !projectData.minNumberGroupMembers ||
+        !projectData.maxNumberGroupMembers ||
         projectData.meetingTypes.length === 0 ||
         projectData.cooperationModes.length === 0 ||
         projectData.documentationLanguages.length === 0 ||
@@ -965,7 +1123,7 @@ function validateProjectData(projectData) {
         return "Podaj poprawny adres email kontaktowy.";
     }
 
-    if (projectData.minMembers > projectData.maxMembers) {
+    if (projectData.minNumberGroupMembers > projectData.maxNumberGroupMembers) {
         return "Minimalna liczba członków zespołu nie może być większa od maksymalnej.";
     }
 
@@ -991,7 +1149,7 @@ function showProjectDetails(projectId) {
     document.getElementById("detailsWorkScope").textContent = project.workScope || "";
     document.getElementById("detailsTechResources").textContent = project.neededTechnologies || "";
     document.getElementById("detailsCompany").textContent = companyData.name || "";
-    document.getElementById("detailsSubmissionDate").textContent = project.createdAt ? new Date(project.createdAt).toLocaleDateString() : "";
+    document.getElementById("detailsSubmissionDate").textContent = project.createdAt ? new Date(project.createdAt).toLocaleDateString("pl-PL") : "";
     document.getElementById("detailsTeams").textContent = `${acceptedTeams}/${teamSlots}`;
     document.getElementById("detailsMembersRange").textContent = `${project.minNumberGroupMembers || ""} - ${project.maxNumberGroupMembers || ""}`;
     document.getElementById("detailsPriority").textContent = priorityLabels[project.priority] || "";
@@ -1037,7 +1195,7 @@ function showEditProject() {
     document.getElementById("editWorkScope").value = project.workScope || "";
     document.getElementById("editTechResources").value = project.neededTechnologies || "";
     document.getElementById("editContactEmail").value = companyData.contactEmail || "";
-    document.getElementById("editSubmissionDate").value = project.createdAt ? project.createdAt.split('T')[0] : "";
+    document.getElementById("editSubmissionDate").value = project.createdAt ? project.createdAt.split("T")[0] : "";
     document.getElementById("editTeamSlots").value = project.maxGroups || "";
     document.getElementById("editMinMembers").value = project.minNumberGroupMembers || "";
     document.getElementById("editMaxMembers").value = project.maxNumberGroupMembers || "";
@@ -1066,30 +1224,36 @@ async function confirmEditProject(event) {
         return;
     }
 
-    const updatedProject = await updateProjectInBackend(projectData);
-    const projectIndex = projects.findIndex(item => item.id === currentProjectId);
+    try {
+        const updatedProject = await updateProjectInBackend(projectData);
+        const projectIndex = projects.findIndex(item => item.id === currentProjectId);
 
-    if (projectIndex !== -1) {
-        projects[projectIndex] = {
-            ...projects[projectIndex],
-            ...updatedProject
-        };
+        if (projectIndex !== -1) {
+            projects[projectIndex] = {
+                ...projects[projectIndex],
+                ...updatedProject
+            };
+        }
+
+        renderProjects();
+        showProjectDetails(currentProjectId);
+    } catch (error) {
+        const message = document.getElementById("editMessage");
+        message.textContent = error.message || "Błąd aktualizacji projektu.";
+        message.className = "form-message error";
     }
-
-    renderProjects();
-    showProjectDetails(currentProjectId);
 }
 
 async function showProjectComments() {
     const commentsList = document.getElementById("commentsList");
     commentsList.innerHTML = "<p class='empty-state'>Ładowanie...</p>";
-    
+
     const projectComments = await loadCommentsForProject(currentProjectId);
-    
+
     comments = projectComments.map(c => ({
         id: c.id,
         projectId: c.projectId,
-        authorName: c.user ? `${c.user.name} ${c.user.surname}` : "Nieznany",
+        authorName: c.user ? `${c.user.name} ${c.user.surname}`.trim() : "Nieznany",
         text: c.content
     }));
 
@@ -1116,9 +1280,9 @@ async function showProjectComments() {
 async function showProjectTeams() {
     const teamsList = document.getElementById("teamsList");
     teamsList.innerHTML = "<p class='empty-state'>Ładowanie...</p>";
-    
+
     const projectTeams = await loadTeamsForProject(currentProjectId);
-    
+
     teams = projectTeams.map(t => ({
         id: t.id,
         name: t.name,
@@ -1177,11 +1341,14 @@ function getTeamStatusText(status) {
 
 async function acceptTeam(teamId) {
     const success = await acceptTeamApi(teamId);
+
     if (success) {
         const team = teams.find(item => item.id === teamId);
+
         if (team) {
             team.status = "accepted";
         }
+
         await loadProjects();
         await showProjectTeams();
     }
@@ -1189,11 +1356,14 @@ async function acceptTeam(teamId) {
 
 async function rejectTeam(teamId) {
     const success = await rejectTeamApi(teamId);
+
     if (success) {
         const team = teams.find(item => item.id === teamId);
+
         if (team) {
             team.status = "rejected";
         }
+
         await showProjectTeams();
     }
 }
@@ -1225,7 +1395,7 @@ function showTeamDetails(teamId) {
     } else {
         team.members.forEach(member => {
             const li = document.createElement("li");
-            li.textContent = member.fullName || "";
+            li.textContent = member.fullName || member.email || "";
             membersList.appendChild(li);
         });
     }
@@ -1249,7 +1419,7 @@ async function showRepository() {
 async function renderRepositoryFiles() {
     const fileList = document.getElementById("repositoryFiles");
     fileList.innerHTML = "<li class='empty-state'>Ładowanie...</li>";
-    
+
     repositoryFiles = await loadFilesForGroup(currentTeamId);
 
     fileList.innerHTML = "";
@@ -1268,6 +1438,7 @@ async function renderRepositoryFiles() {
 
 async function uploadFiles(event) {
     const files = event.target.files;
+
     if (!files.length) return;
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -1349,7 +1520,11 @@ function formatArray(value) {
         return "";
     }
 
-    return value.join(", ");
+    if (Array.isArray(value)) {
+        return value.join(", ");
+    }
+
+    return String(value);
 }
 
 function getTodayDate() {

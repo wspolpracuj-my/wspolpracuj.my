@@ -20,8 +20,17 @@
             <div class="user-menu">
                 <button class="user-menu-toggle" onclick="toggleUserMenu(event)" aria-expanded="false">
                     <span class="user-avatar">A</span>
-                    <span class="user-name">Admin</span>
-                    <span class="user-arrow">⌄</span>
+
+                    <span class="user-info">
+                        <span class="user-name">Admin</span>
+                        <span class="user-role">Admin</span>
+                    </span>
+
+                    <span class="hamburger-icon" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
                 </button>
 
                 <div id="userDropdown" class="user-dropdown">
@@ -33,15 +42,83 @@
         <section id="dashboard" class="view active-view">
             <div class="admin-start-box">
                 <p class="small-label">Panel administratora</p>
-                <h1>Cześć, admin</h1>
+                <h1>Cześć<span id="dashboardUserName">, admin</span></h1>
 
                 <div class="admin-menu-grid">
+                    <button onclick="showAdminDashboard()">DASHBOARD</button>
                     <button onclick="showStudents()">STUDENCI</button>
                     <button onclick="showTeams()">ZESPOŁY</button>
                     <button onclick="showCompanies()">FIRMY</button>
                     <button onclick="showProjects()">PROJEKTY</button>
                     <button onclick="showNotifications()">POWIADOMIENIA</button>
                 </div>
+            </div>
+        </section>
+
+        <section id="adminDashboard" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="dashboard-choice-card">
+                <button class="dashboard-choice-button" onclick="showActiveProjects()">
+                    <span class="dashboard-choice-icon folder-icon"></span>
+                    <span>AKTYWNE PROJEKTY</span>
+                    <span class="dashboard-choice-arrow">›</span>
+                </button>
+
+                <button class="dashboard-choice-button" onclick="showStatistics()">
+                    <span class="dashboard-choice-icon stats-icon"></span>
+                    <span>STATYSTYKI</span>
+                    <span class="dashboard-choice-arrow">›</span>
+                </button>
+            </div>
+        </section>
+
+        <section id="activeProjects" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Aktywne projekty</h2>
+                    <p class="muted">Lista wszystkich projektów na platformie.</p>
+                </div>
+            </div>
+
+            <div id="activeProjectsList" class="active-projects-box scroll-list"></div>
+        </section>
+
+        <section id="statistics" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Statystyki</h2>
+                    <p class="muted">Przegląd danych projektowych i firmowych.</p>
+                </div>
+            </div>
+
+            <div class="statistics-layout">
+                <section class="stats-card filled-projects-card">
+                    <div class="stats-card-header">
+                        <div>
+                            <h3>Zapełnione projekty</h3>
+                            <p>Projekty, w których liczba zajętych miejsc jest równa liczbie dostępnych miejsc.</p>
+                        </div>
+
+                        <strong id="filledProjectsCounter" class="stats-counter">0</strong>
+                    </div>
+
+                    <div id="filledProjectsList" class="filled-projects-list"></div>
+                </section>
+
+                <section class="stats-card">
+                    <h3>Obciążone firmy wg. liczby projektów</h3>
+                    <div id="companiesByProjectsChart" class="podium-chart"></div>
+                </section>
+
+                <section class="stats-card">
+                    <h3>Obciążone firmy wg. liczby zespołów</h3>
+                    <div id="companiesByTeamsChart" class="podium-chart"></div>
+                </section>
             </div>
         </section>
 
@@ -308,10 +385,7 @@
                 <h3>Pliki</h3>
 
                 <div class="upload-area">
-                    <p>
-                        Miejsce na wrzucanie plików z rozszerzeniami według dokumentacji.
-                    </p>
-
+                    <p>Miejsce na wrzucanie plików z rozszerzeniami według dokumentacji.</p>
                     <input type="file" multiple>
                 </div>
 
@@ -340,17 +414,11 @@ const authToken = localStorage.getItem("token");
 const currentUser = safeParseJson(localStorage.getItem("user"));
 
 let students = [];
-
 let companies = [];
-
 let projects = [];
-
 let teams = [];
-
 let notifications = [];
-
 let comments = [];
-
 let repositoryFiles = [];
 
 const priorityLabels = {
@@ -371,12 +439,15 @@ function safeParseJson(value) {
 
 function buildHeaders(json = true) {
     const headers = {};
+
     if (json) {
         headers["Content-Type"] = "application/json";
     }
+
     if (authToken) {
         headers["Authorization"] = `Bearer ${authToken}`;
     }
+
     return headers;
 }
 
@@ -398,17 +469,7 @@ function ensureAdmin() {
         return false;
     }
 
-    const avatar = document.querySelector(".user-avatar");
-    const name = document.querySelector(".user-name");
-    const userName = [currentUser.name, currentUser.surname].filter(Boolean).join(" ");
-
-    if (avatar) {
-        avatar.textContent = (currentUser.name || "A")[0]?.toUpperCase() || "A";
-    }
-
-    if (name) {
-        name.textContent = userName || "Admin";
-    }
+    setUserMenuData();
 
     return true;
 }
@@ -428,6 +489,7 @@ async function apiGet(path) {
 
 async function loadStudents() {
     const data = await apiGet("/users/students");
+
     students = data.map(student => ({
         id: student.studentId,
         userId: student.userId,
@@ -438,6 +500,7 @@ async function loadStudents() {
 
 async function loadCompanies() {
     const data = await apiGet("/companies");
+
     companies = data.map(company => ({
         id: company.id,
         name: company.companyName,
@@ -447,6 +510,7 @@ async function loadCompanies() {
 
 async function loadProjects() {
     const data = await apiGet("/projects");
+
     projects = data.map(project => ({
         id: project.id,
         topic: project.topic,
@@ -458,6 +522,7 @@ async function loadProjects() {
 
 async function loadTeams() {
     const data = await apiGet("/groups");
+
     teams = data.map(team => ({
         id: team.id,
         name: team.name,
@@ -470,6 +535,7 @@ async function loadTeams() {
 
 async function loadNotifications() {
     const data = await apiGet("/notifications/all");
+
     notifications = data.map(notification => ({
         id: notification.id,
         title: notification.userName || `Użytkownik ${notification.userId}`,
@@ -499,7 +565,9 @@ async function loadInitialData() {
         renderNotifications();
     } catch (error) {
         console.error("Błąd ładowania danych:", error);
+
         const dashboard = document.getElementById("dashboard");
+
         if (dashboard) {
             dashboard.innerHTML = `
                 <div class="admin-start-box">
@@ -509,6 +577,74 @@ async function loadInitialData() {
                 </div>
             `;
         }
+    }
+}
+
+function getCurrentUserName() {
+    if (!currentUser) {
+        return "Admin";
+    }
+
+    const fullName = [
+        currentUser.name,
+        currentUser.surname
+    ].filter(Boolean).join(" ").trim();
+
+    if (fullName) {
+        return fullName;
+    }
+
+    if (currentUser.fullName) {
+        return currentUser.fullName;
+    }
+
+    if (currentUser.username) {
+        return currentUser.username;
+    }
+
+    if (currentUser.login) {
+        return currentUser.login;
+    }
+
+    if (currentUser.email) {
+        return currentUser.email.split("@")[0];
+    }
+
+    return "Admin";
+}
+
+function getUserInitial(userName) {
+    const cleanName = String(userName || "Admin").trim();
+
+    if (!cleanName) {
+        return "A";
+    }
+
+    return cleanName[0].toUpperCase();
+}
+
+function setUserMenuData() {
+    const avatar = document.querySelector(".user-avatar");
+    const name = document.querySelector(".user-name");
+    const role = document.querySelector(".user-role");
+    const dashboardName = document.getElementById("dashboardUserName");
+
+    const userName = getCurrentUserName();
+
+    if (avatar) {
+        avatar.textContent = getUserInitial(userName);
+    }
+
+    if (name) {
+        name.textContent = userName;
+    }
+
+    if (role) {
+        role.textContent = "Admin";
+    }
+
+    if (dashboardName) {
+        dashboardName.textContent = `, ${userName}`;
     }
 }
 
@@ -523,7 +659,11 @@ function showView(viewId, saveHistory = true) {
         view.classList.remove("active-view");
     });
 
-    document.getElementById(viewId).classList.add("active-view");
+    const nextView = document.getElementById(viewId);
+
+    if (nextView) {
+        nextView.classList.add("active-view");
+    }
 }
 
 function goBack() {
@@ -541,6 +681,10 @@ function toggleUserMenu(event) {
 
     const menu = document.querySelector(".user-menu");
     const toggle = document.querySelector(".user-menu-toggle");
+
+    if (!menu || !toggle) {
+        return;
+    }
 
     menu.classList.toggle("open");
 
@@ -570,6 +714,20 @@ function logout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     window.location.href = "index.html";
+}
+
+function showAdminDashboard() {
+    showView("adminDashboard");
+}
+
+function showActiveProjects() {
+    renderActiveProjects();
+    showView("activeProjects");
+}
+
+function showStatistics() {
+    renderStatistics();
+    showView("statistics");
 }
 
 function showStudents() {
@@ -730,6 +888,142 @@ function renderNotifications() {
     });
 }
 
+function renderActiveProjects() {
+    const list = document.getElementById("activeProjectsList");
+    list.innerHTML = "";
+
+    if (projects.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak aktywnych projektów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    projects.forEach(project => {
+        const button = document.createElement("button");
+        button.className = "active-project-row";
+        button.onclick = () => showProjectDetails(project.id);
+
+        button.innerHTML = `
+            <span class="active-project-icon"></span>
+            <strong>
+                ${escapeHtml(project.topic || "Projekt")}
+                [${escapeHtml(project.companyName || "Brak firmy")}]
+                ${project.currentGroupsCount || 0}/${project.maxGroups || 0}
+            </strong>
+            <span class="active-project-arrow">›</span>
+        `;
+
+        list.appendChild(button);
+    });
+}
+
+function renderStatistics() {
+    renderFilledProjects();
+    renderCompaniesByProjects();
+    renderCompaniesByTeams();
+}
+
+function renderFilledProjects() {
+    const counter = document.getElementById("filledProjectsCounter");
+    const list = document.getElementById("filledProjectsList");
+
+    list.innerHTML = "";
+
+    const filledProjects = projects.filter(project => {
+        return Number(project.maxGroups || 0) > 0 && Number(project.currentGroupsCount || 0) >= Number(project.maxGroups || 0);
+    });
+
+    counter.textContent = filledProjects.length;
+
+    if (filledProjects.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak zapełnionych projektów.</p>";
+        return;
+    }
+
+    filledProjects.forEach(project => {
+        const item = document.createElement("div");
+        item.className = "filled-project-item";
+
+        item.innerHTML = `
+            <span class="check-icon">✓</span>
+            <strong>
+                ${escapeHtml(project.topic || "Projekt")}
+                [${escapeHtml(project.companyName || "Brak firmy")}]
+                ${project.currentGroupsCount || 0}/${project.maxGroups || 0}
+            </strong>
+        `;
+
+        list.appendChild(item);
+    });
+}
+
+function renderCompaniesByProjects() {
+    const ranking = getCompaniesRankingByProjects();
+    renderPodiumChart("companiesByProjectsChart", ranking);
+}
+
+function renderCompaniesByTeams() {
+    const ranking = getCompaniesRankingByTeams();
+    renderPodiumChart("companiesByTeamsChart", ranking);
+}
+
+function getCompaniesRankingByProjects() {
+    const map = new Map();
+
+    projects.forEach(project => {
+        const companyName = project.companyName || "Brak firmy";
+        const currentValue = map.get(companyName) || 0;
+        map.set(companyName, currentValue + 1);
+    });
+
+    return Array.from(map.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3);
+}
+
+function getCompaniesRankingByTeams() {
+    const map = new Map();
+
+    projects.forEach(project => {
+        const companyName = project.companyName || "Brak firmy";
+        const currentValue = map.get(companyName) || 0;
+        map.set(companyName, currentValue + Number(project.currentGroupsCount || 0));
+    });
+
+    return Array.from(map.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3);
+}
+
+function renderPodiumChart(containerId, ranking) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+
+    if (ranking.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak danych do wyświetlenia.</p>";
+        return;
+    }
+
+    const order = [ranking[1], ranking[0], ranking[2]].filter(Boolean);
+
+    order.forEach(item => {
+        const originalIndex = ranking.findIndex(rank => rank.name === item.name);
+        const place = originalIndex + 1;
+
+        const bar = document.createElement("div");
+        bar.className = `podium-item podium-place-${place}`;
+
+        bar.innerHTML = `
+            <span class="podium-place">${place}</span>
+            <div class="podium-bar"></div>
+            <strong>${escapeHtml(item.name)}</strong>
+        `;
+
+        container.appendChild(bar);
+    });
+}
+
 function showAddCompany() {
     document.getElementById("newCompanyName").value = "";
     document.getElementById("newCompanyLogin").value = "";
@@ -797,7 +1091,8 @@ async function addCompany(event) {
         notifications.unshift({
             id: Date.now(),
             title: "Nowe konto firmy",
-            text: `Administrator dodał nową firmę ${name}.`
+            text: `Administrator dodał nową firmę ${name}.`,
+            date: new Date().toLocaleString("pl-PL")
         });
 
         renderCompanies();
@@ -960,8 +1255,7 @@ async function showProjectDetails(projectId) {
     document.getElementById("projectDetailsWorkScope").textContent = currentProjectDetails?.workScope || "";
     document.getElementById("projectDetailsTechResources").textContent = currentProjectDetails?.neededTechnologies || "";
     document.getElementById("projectDetailsCompany").textContent = currentProjectDetails?.companyName || summary.companyName || "";
-    document.getElementById("projectDetailsTeams").textContent =
-        `${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
+    document.getElementById("projectDetailsTeams").textContent = `${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
     document.getElementById("projectDetailsPriority").textContent =
         priorityLabels[currentProjectDetails?.priority] || (currentProjectDetails?.priority ? String(currentProjectDetails.priority) : "");
 
@@ -1100,13 +1394,13 @@ async function showTeamDetails(teamId) {
     const project = projects.find(item => item.id === team.projectId);
 
     document.getElementById("teamDetailsName").textContent = team.name || "";
-    document.getElementById("teamDetailsProject").textContent =
-        `Przypisany projekt: ${project?.topic || "Brak projektu"}`;
+    document.getElementById("teamDetailsProject").textContent = `Przypisany projekt: ${project?.topic || "Brak projektu"}`;
 
     const membersList = document.getElementById("teamDetailsMembers");
     membersList.innerHTML = "";
 
     let members = team.members || [];
+
     if (members.length === 0) {
         try {
             const response = await apiGet(`/groups/${teamId}`);
