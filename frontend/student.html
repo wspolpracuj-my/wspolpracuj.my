@@ -325,7 +325,7 @@
 </div>
 
 <script>
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://localhost:8081/api";
 
 let studentData = {
     id: null,
@@ -355,7 +355,7 @@ const applicationStatuses = {
 
 // Helper to get auth token
 function getAuthToken() {
-    return localStorage.getItem('jwt_token') || '';
+    return localStorage.getItem('token') || '';
 }
 
 // Helper to make API requests
@@ -397,38 +397,40 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 
 async function loadInitialData() {
     try {
-        // Get current user (from localStorage since we're on student page)
-        const currentUserId = localStorage.getItem('user_id');
-        if (!currentUserId) {
-            System.out.println('No user ID found in localStorage, redirecting to login');
+        const currentUserJson = localStorage.getItem('user');
+        const currentUser = currentUserJson ? JSON.parse(currentUserJson) : null;
+        const token = getAuthToken();
+
+        if (!currentUser?.userId || !token) {
             window.location.href = 'index.html';
             return;
         }
 
-        // Fetch current student
-        const student = await apiRequest(`/students/${currentUserId}`);
+        // Fetch current student by authenticated user id
+        const student = await apiRequest(`/students/byUser/${currentUser.userId}`);
         if (student) {
             studentData = {
                 id: student.id,
-                fullName: `${student.user?.name || ''} ${student.user?.surname || ''}`.trim(),
+                fullName: currentUser.fullName || '',
                 email: student.email,
                 teamId: student.groupId
             };
 
             // Fetch student's group if they have one
             if (student.groupId) {
-                const group = await apiRequest(`/groups/${student.groupId}`);
+                const group = await apiRequest(`/groups/${student.groupId}/summary`);
                 if (group) {
                     currentTeam = {
                         id: group.id,
                         name: group.name,
                         projectId: group.projectId,
+                        size: group.maxMembers ?? (group.members?.length || 0),
                         applicationStatus: group.isAccepted ? (group.projectId ? 'accepted' : 'pending') : 'none',
                         leaderId: group.leaderId,
                         members: group.members?.map(m => ({
                             id: m.id,
-                            fullName: `${m.user?.name || ''} ${m.user?.surname || ''}`.trim(),
-                            email: m.email,
+                            fullName: m.userName || '',
+                            email: m.email || '',
                             role: m.id === group.leaderId ? 'leader' : 'member'
                         })) || []
                     };
@@ -472,8 +474,8 @@ async function saveTeamToBackend(teamData) {
         const groupData = {
             name: teamData.name,
             projectId: 0,
-            isAccepted: false,
-            leaderId: studentData.id
+            leaderId: studentData.id,
+            maxMembers: teamData.size || 1
         };
 
         const created = await apiRequest('/groups', 'POST', groupData);
@@ -511,10 +513,16 @@ async function joinTeamInBackend(teamId) {
 async function updateTeamInBackend(teamData) {
     try {
         const updateData = {
-            name: teamData.name,
-            projectId: teamData.projectId || 0,
-            isAccepted: teamData.applicationStatus === 'accepted'
+            name: teamData.name
         };
+
+        if (teamData.projectId != null) {
+            updateData.projectId = teamData.projectId;
+        }
+
+        if (teamData.size != null) {
+            updateData.maxMembers = teamData.size;
+        }
 
         await apiRequest(`/groups/${teamData.id}`, 'PUT', updateData);
         return true;
@@ -526,18 +534,17 @@ async function updateTeamInBackend(teamData) {
 
 async function inviteStudentToBackend(email) {
     try {
-        // Find student by email and add to group
-        const students = await apiRequest('/students');
-        const student = students?.find(s => s.email === email);
-        
-        if (!student) {
+        // Find student by email using dedicated endpoint and add to group
+        const student = await apiRequest(`/students/byEmail?email=${encodeURIComponent(email)}`);
+
+        if (!student || !student.id) {
             throw new Error('Student nie znaleziony');
         }
 
         await apiRequest(`/students/${student.id}/group`, 'PATCH', {
             groupId: currentTeam.id
         });
-        
+
         return true;
     } catch (error) {
         console.error('Error inviting student:', error);
@@ -564,8 +571,7 @@ async function applyTeamToProjectInBackend(projectId) {
         
         const updateData = {
             name: currentTeam.name,
-            projectId: projectId,
-            isAccepted: false
+            projectId: projectId
         };
 
         await apiRequest(`/groups/${currentTeam.id}`, 'PUT', updateData);
@@ -638,8 +644,8 @@ function goBack() {
 }
 
 function logout() {
-    localStorage.removeItem('jwt_token');
-    localStorage.removeItem('user_id');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.href = 'index.html';
 }
 
@@ -699,9 +705,8 @@ async function createTeam(event) {
     try {
         const teamData = {
             name: name,
-            projectId: 0,
-            isAccepted: false,
-            leaderId: studentData.id
+            leaderId: studentData.id,
+            maxMembers: size
         };
 
         const createdTeam = await apiRequest('/groups', 'POST', teamData);
@@ -719,6 +724,7 @@ async function createTeam(event) {
             id: createdTeam.id,
             name: createdTeam.name,
             projectId: createdTeam.projectId,
+            size: teamData.maxMembers,
             applicationStatus: createdTeam.isAccepted ? 'accepted' : 'none',
             leaderId: createdTeam.leaderId,
             members: [{
@@ -804,32 +810,25 @@ async function joinTeam(teamId) {
     try {
         await joinTeamInBackend(teamId);
 
-        const team = invitedTeams.find(item => item.id === teamId);
+        const group = await apiRequest(`/groups/${teamId}/summary`);
 
-        if (!team) {
+        if (!group) {
             throw new Error('Team not found');
         }
 
         currentTeam = {
-            id: team.id,
-            name: team.name,
-            projectId: team.projectId,
-            applicationStatus: team.isAccepted ? 'accepted' : 'none',
-            leaderId: team.leaderId,
-            members: [
-                ...(team.members || []).map(m => ({
-                    id: m.id,
-                    fullName: m.fullName || `${m.user?.name || ''} ${m.user?.surname || ''}`.trim(),
-                    email: m.email,
-                    role: m.id === team.leaderId ? 'leader' : 'member'
-                })),
-                {
-                    id: studentData.id,
-                    fullName: studentData.fullName,
-                    email: studentData.email,
-                    role: "member"
-                }
-            ]
+            id: group.id,
+            name: group.name,
+            projectId: group.projectId,
+            size: group.maxMembers ?? (group.members?.length || 0),
+            applicationStatus: group.isAccepted ? (group.projectId ? 'accepted' : 'pending') : 'none',
+            leaderId: group.leaderId,
+            members: group.members?.map(m => ({
+                id: m.id,
+                fullName: m.userName || '',
+                email: m.email || '',
+                role: m.id === group.leaderId ? 'leader' : 'member'
+            })) || []
         };
 
         studentData.teamId = currentTeam.id;
@@ -1324,13 +1323,11 @@ function renderRepositoryFiles() {
 }
 
 function isCurrentStudentLeader() {
-    if (!currentTeam || !currentTeam.members) {
+    if (!currentTeam || !currentTeam.leaderId || studentData.id == null) {
         return false;
     }
 
-    const currentMember = currentTeam.members.find(member => member.id === studentData.id);
-
-    return currentMember?.role === "leader";
+    return currentTeam.leaderId === studentData.id;
 }
 
 function isValidEmail(email) {

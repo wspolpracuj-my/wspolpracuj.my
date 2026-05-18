@@ -109,6 +109,7 @@ namespace wspolpracujmy.Controllers
             {
                 Name = dto.Name.Trim(),
                 LeaderId = currentStudent.Id,
+                IsAccepted = GroupStatus.Pending,
                 Members = new List<Student>(),
                 GroupRequests = new List<GroupRequest>(),
                 GroupFiles = new List<GroupFile>(),
@@ -201,7 +202,9 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) gdy zakończono pomyślnie.</returns>
         public async Task<IActionResult> Put(int id, [FromBody] dynamic updateData)
         {
-            var group = await _db.Groups.FindAsync(id);
+            if (updateData == null) return BadRequest("Dane do aktualizacji nie mogą być puste.");
+
+            var group = await _db.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
             if (group == null) return NotFound();
 
             int currentUserId = GetCurrentUserId();
@@ -214,13 +217,28 @@ namespace wspolpracujmy.Controllers
                     group.Name = updateData.name;
 
                 if (updateData.projectId != null)
-                    group.ProjectId = updateData.projectId;
+                {
+                    int projectId = (int)updateData.projectId;
+                    group.ProjectId = projectId > 0 ? projectId : null;
+                }
 
                 if (updateData.isAccepted != null)
                     group.IsAccepted = updateData.isAccepted;
 
+                if (updateData.maxMembers != null)
+                {
+                    int maxMembers = (int)updateData.maxMembers;
+                    var memberCount = group.Members?.Count ?? await _db.Students.CountAsync(s => s.GroupId == group.Id);
+                    if (maxMembers < memberCount)
+                        return BadRequest("Nowy limit członków nie może być mniejszy niż aktualna liczba członków.");
+                    group.MaxMembers = maxMembers;
+                }
+
                 if (updateData.leaderId != null)
-                    group.LeaderId = updateData.leaderId;
+                {
+                    int leaderId = (int)updateData.leaderId;
+                    group.LeaderId = leaderId > 0 ? leaderId : null;
+                }
 
                 await _db.SaveChangesAsync();
                 return NoContent();
@@ -351,11 +369,15 @@ namespace wspolpracujmy.Controllers
                     Id = g.Id,
                     Name = g.Name,
                     LeaderId = g.LeaderId ?? 0,
+                    ProjectId = g.ProjectId,
+                    MaxMembers = g.MaxMembers,
+                    IsAccepted = g.IsAccepted.HasValue,
                     MemberCount = g.Members.Count,
                     Members = g.Members.Select(m => new MemberSummaryDto
                     {
                         Id = m.Id,
                         UserName = m.User.Name + " " + m.User.Surname,
+                        Email = m.Email
                     }).ToList()
                 })
                 .ToListAsync();
@@ -382,11 +404,15 @@ namespace wspolpracujmy.Controllers
                     Id = g.Id,
                     Name = g.Name,
                     LeaderId = g.LeaderId ?? 0,
+                    ProjectId = g.ProjectId,
+                    MaxMembers = g.MaxMembers,
+                    IsAccepted = g.IsAccepted.HasValue,
                     MemberCount = g.Members.Count,
                     Members = g.Members.Select(m => new MemberSummaryDto
                     {
                         Id = m.Id,
                         UserName = m.User.Name + " " + m.User.Surname,
+                        Email = m.Email
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();
@@ -417,7 +443,7 @@ namespace wspolpracujmy.Controllers
             if (group.Project?.Company?.UserId == userId) return true;
 
             // Group leader can manage their group
-            if (group.LeaderId == userId) return true;
+            if (group.LeaderId.HasValue && group.LeaderId.Value == userId) return true;
 
             // Group members can view/manage their group (for some actions)
             var isMember = await _db.Students.AnyAsync(s => s.GroupId == groupId && s.UserId == userId);

@@ -63,6 +63,24 @@ namespace wspolpracujmy.Controllers
             return Ok(student);
         }
 
+        [HttpGet("byUser/{userId:int}")]
+        public async Task<ActionResult<StudentDto>> GetByUserId(int userId)
+        {
+            var student = await _db.Students
+                .Where(s => s.UserId == userId)
+                .Select(s => new StudentDto
+                {
+                    Id = s.Id,
+                    UserId = s.UserId,
+                    GroupId = s.GroupId,
+                    Email = s.Email
+                })
+                .FirstOrDefaultAsync();
+
+            if (student == null) return NotFound();
+            return Ok(student);
+        }
+
         // [HttpPost]
         // /// <summary>
         // /// Tworzy nowego studenta w systemie.
@@ -95,9 +113,14 @@ namespace wspolpracujmy.Controllers
             var student = await _db.Students.FindAsync(id);
             if (student == null) return NotFound();
 
-            var group = await _db.Groups.FindAsync(dto.GroupId);
-            if (group == null) return BadRequest(new { error = "Nie znaleziono grupy." });
+            if (dto.GroupId.HasValue)
+            {
+                var group = await _db.Groups.FindAsync(dto.GroupId.Value);
+                if (group == null) return BadRequest(new { error = "Nie znaleziono grupy." });
+            }
 
+            student.GroupId = dto.GroupId;
+            _db.Students.Update(student);
             await _db.SaveChangesAsync();
             return NoContent();
         }
