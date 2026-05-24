@@ -14,6 +14,14 @@ services:
  #     ASPNETCORE_URLS: http://+:8080
     ports:
       - "8080:8080"
+  frontend:
+    build:
+      context: ../../../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
   db:
     image: postgres:18
     restart: always
