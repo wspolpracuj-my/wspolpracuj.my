@@ -6,7 +6,9 @@ using wspolpracujmy.Data;
 
 namespace wspolpracujmy.Services
 {
-    // Optional service for explicit ownership checks from controllers/services
+    /// <summary>
+    /// Pomocniczy serwis autoryzacyjny do sprawdzania własności grupy.
+    /// </summary>
     public class GroupAuthorizationService
     {
         private readonly AppDbContext _db;
@@ -16,7 +18,9 @@ namespace wspolpracujmy.Services
             _db = db;
         }
 
-        // Extracts user id from ClaimsPrincipal robustly
+        /// <summary>
+        /// Pobiera identyfikator użytkownika z claims.
+        /// </summary>
         public static int? GetUserIdFromClaims(ClaimsPrincipal user)
         {
             var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -26,13 +30,17 @@ namespace wspolpracujmy.Services
             return null;
         }
 
-        // Extract role
+        /// <summary>
+        /// Pobiera rolę użytkownika z claims.
+        /// </summary>
         public static string? GetRoleFromClaims(ClaimsPrincipal user)
         {
             return user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("role")?.Value;
         }
 
-        // Checks if the current user (by userId) is the leader of the group
+        /// <summary>
+        /// Sprawdza, czy użytkownik jest liderem wskazanej grupy.
+        /// </summary>
         public async Task<bool> IsUserLeaderOfGroupAsync(int userId, int groupId)
         {
             var student = await _db.Students.FirstOrDefaultAsync(s => s.UserId == userId);

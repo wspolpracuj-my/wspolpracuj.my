@@ -17,7 +17,24 @@
                 <p class="account-type">Panel studenta</p>
             </div>
 
-            <button class="logout-btn" onclick="logout()">Wyloguj</button>
+            <div class="user-menu">
+                <button class="user-menu-toggle" onclick="toggleUserMenu(event)" aria-expanded="false">
+                    <span class="user-avatar">S</span>
+                    <span class="user-info">
+                        <span class="user-name">Student</span>
+                        <span class="user-role">Student</span>
+                    </span>
+                    <span class="hamburger-icon" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </button>
+
+                <div id="userDropdown" class="user-dropdown">
+                    <button onclick="logout()">Wyloguj</button>
+                </div>
+            </div>
         </header>
 
         <section id="dashboard" class="view active-view">
@@ -35,7 +52,7 @@
             <div class="section-title-row">
                 <div>
                     <h2>Powiadomienia</h2>
-                    <p class="muted">Powiadomienia dotyczą wyłącznie zespołu studenta.</p>
+                    <p class="muted">Informacje od firm o komentarzach i zgłoszeniach do projektów (tylko tekst).</p>
                 </div>
             </div>
 
@@ -128,7 +145,7 @@
             <div class="section-title-row centered-title">
                 <div>
                     <h2>Zaproś studenta</h2>
-                    <p class="muted">Podaj mail studencki osoby, którą chcesz zaprosić do zespołu.</p>
+                    <p class="muted">Podaj mail studencki (@g.elearn.uz.zgora.pl lub @stud.uz.zgora.pl). Student może należeć tylko do jednego zespołu.</p>
                 </div>
             </div>
 
@@ -314,7 +331,8 @@
 
                 <div class="upload-area">
                     <p>Wybierz pliki z dysku.</p>
-                    <input type="file" multiple>
+                    <input id="repositoryFileInput" type="file" multiple onchange="handleFileUpload(event)">
+                    <p id="repositoryUploadMessage" class="form-message"></p>
                 </div>
 
                 <ul id="repositoryFiles" class="file-list"></ul>
@@ -325,7 +343,7 @@
 </div>
 
 <script>
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://localhost:8081/api";
 
 let studentData = {
     id: null,
@@ -353,18 +371,16 @@ const applicationStatuses = {
     accepted: "Zaakceptowany"
 };
 
-// Helper to get auth token
 function getAuthToken() {
-    return localStorage.getItem('jwt_token') || '';
+    return localStorage.getItem('token') || '';
 }
 
-// Helper to make API requests
-async function apiRequest(endpoint, method = 'GET', body = null) {
+async function apiRequest(endpoint, method = "GET", body = null) {
     const options = {
         method,
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getAuthToken()}`
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${getAuthToken()}`
         }
     };
 
@@ -374,62 +390,86 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 
     try {
         const response = await fetch(`${API_URL}${endpoint}`, options);
+
         if (!response.ok) {
             if (response.status === 401) {
-                // Unauthorized - redirect to login
-                window.location.href = 'index.html';
+                window.location.href = "index.html";
                 return null;
             }
-            const error = await response.json();
-            throw new Error(error.message || `HTTP ${response.status}`);
+            const rawText = await response.text();
+            let errorBody = null;
+            if (rawText) {
+                try {
+                    errorBody = JSON.parse(rawText);
+                } catch (_) {
+                    throw new Error(rawText.trim() || `HTTP ${response.status}`);
+                }
+            }
+
+            const validationErrors = errorBody?.errors
+                ? Object.values(errorBody.errors).flat().filter(Boolean)
+                : [];
+            const detail = validationErrors[0]
+                || errorBody?.message
+                || errorBody?.error
+                || errorBody?.title
+                || errorBody?.detail
+                || (typeof errorBody === "string" ? errorBody : null);
+
+            throw new Error(detail || `HTTP ${response.status}`);
         }
-        
+
         if (response.status === 204) {
-            return null; // No content
+            return null;
         }
-        
+
         return await response.json();
     } catch (error) {
-        console.error('API Error:', error);
+        console.error("API Error:", error);
         throw error;
     }
 }
 
 async function loadInitialData() {
     try {
-        // Get current user (from localStorage since we're on student page)
-        const currentUserId = localStorage.getItem('user_id');
-        if (!currentUserId) {
-            System.out.println('No user ID found in localStorage, redirecting to login');
-            window.location.href = 'index.html';
+        const currentUserJson = localStorage.getItem("user");
+        const currentUser = currentUserJson ? JSON.parse(currentUserJson) : null;
+        const token = getAuthToken();
+
+        if (!currentUser?.userId || !token) {
+            window.location.href = "index.html";
             return;
         }
 
-        // Fetch current student
-        const student = await apiRequest(`/students/${currentUserId}`);
+        const student = await apiRequest(`/students/byUser/${currentUser.userId}`);
         if (student) {
             studentData = {
                 id: student.id,
-                fullName: `${student.user?.name || ''} ${student.user?.surname || ''}`.trim(),
+                fullName: currentUser.fullName || "",
                 email: student.email,
                 teamId: student.groupId
             };
 
-            // Fetch student's group if they have one
             if (student.groupId) {
-                const group = await apiRequest(`/groups/${student.groupId}`);
+                const group = await apiRequest(`/groups/${student.groupId}/summary`);
                 if (group) {
+                    const groupAccepted = group.isAccepted === true
+                        || group.isAccepted === "Accepted"
+                        || group.isAccepted === 1;
+
                     currentTeam = {
                         id: group.id,
                         name: group.name,
-                        projectId: group.projectId,
-                        applicationStatus: group.isAccepted ? (group.projectId ? 'accepted' : 'pending') : 'none',
+                        projectId: groupAccepted && group.projectId ? group.projectId : null,
+                        pendingProjectId: null,
+                        size: group.maxMembers ?? (group.members?.length || 0),
+                        applicationStatus: groupAccepted && group.projectId ? "accepted" : "none",
                         leaderId: group.leaderId,
                         members: group.members?.map(m => ({
                             id: m.id,
-                            fullName: `${m.user?.name || ''} ${m.user?.surname || ''}`.trim(),
-                            email: m.email,
-                            role: m.id === group.leaderId ? 'leader' : 'member'
+                            fullName: m.userName || "",
+                            email: m.email || "",
+                            role: m.id === group.leaderId ? "leader" : "member"
                         })) || []
                     };
                 }
@@ -438,32 +478,27 @@ async function loadInitialData() {
             setStudentData(studentData);
         }
 
-        // Fetch notifications
-        const notif = await apiRequest('/notifications');
+        const notif = await apiRequest("/notifications");
         if (notif) {
-            notifications = Array.isArray(notif) ? notif : [];
+            notifications = (Array.isArray(notif) ? notif : []).map(normalizeNotification);
         }
 
-        // Fetch available projects
-        const projects = await apiRequest('/projects');
+        const projects = await apiRequest("/projects/summary/all");
         if (projects) {
             availableProjects = Array.isArray(projects) ? projects.map(p => ({
-                id: p.id,
-                topic: p.topic,
-                companyName: p.company?.name,
-                description: p.description,
-                goal: p.projectGoal,
-                workScope: p.workScope,
-                techResources: p.neededTechnologies,
-                teamSlots: p.maxGroups,
-                acceptedTeams: 0, // TODO: calculate from database
-                tags: p.tags ? p.tags.map(t => t.name) : []
+                id: p.id ?? p.Id,
+                topic: p.topic ?? p.Topic,
+                companyName: p.companyName ?? p.CompanyName ?? "",
+                teamSlots: p.maxGroups ?? p.MaxGroups ?? 0,
+                acceptedTeams: p.currentGroupsCount ?? p.CurrentGroupsCount ?? 0
             })) : [];
         }
 
+        await refreshTeamApplicationState();
+
         renderNotifications();
     } catch (error) {
-        console.error('Error loading initial data:', error);
+        console.error("Error loading initial data:", error);
     }
 }
 
@@ -472,15 +507,14 @@ async function saveTeamToBackend(teamData) {
         const groupData = {
             name: teamData.name,
             projectId: 0,
-            isAccepted: false,
-            leaderId: studentData.id
+            leaderId: studentData.id,
+            maxMembers: teamData.size || 1
         };
 
-        const created = await apiRequest('/groups', 'POST', groupData);
-        
-        // Add current student to the group
+        const created = await apiRequest("/groups", "POST", groupData);
+
         if (created && studentData.id) {
-            await apiRequest(`/students/${studentData.id}/group`, 'PATCH', {
+            await apiRequest(`/students/${studentData.id}/group`, "PATCH", {
                 groupId: created.id
             });
         }
@@ -491,109 +525,277 @@ async function saveTeamToBackend(teamData) {
             leaderId: studentData.id
         };
     } catch (error) {
-        console.error('Error saving team:', error);
+        console.error("Error saving team:", error);
         throw error;
     }
 }
 
-async function joinTeamInBackend(teamId) {
-    try {
-        await apiRequest(`/students/${studentData.id}/group`, 'PATCH', {
-            groupId: teamId
-        });
-        return true;
-    } catch (error) {
-        console.error('Error joining team:', error);
-        throw error;
+function getCurrentUserName() {
+    if (studentData.fullName) {
+        return studentData.fullName;
     }
+
+    const storedName = localStorage.getItem("user_name") || localStorage.getItem("username") || localStorage.getItem("email") || "";
+
+    if (storedName.includes("@")) {
+        return storedName.split("@")[0];
+    }
+
+    return storedName || "Student";
+}
+
+function getUserInitial(userName) {
+    const cleanName = String(userName || "Student").trim();
+
+    if (!cleanName) {
+        return "S";
+    }
+
+    return cleanName[0].toUpperCase();
+}
+
+function setUserMenuData() {
+    const userName = getCurrentUserName();
+
+    const avatar = document.querySelector(".user-avatar");
+    const name = document.querySelector(".user-name");
+    const role = document.querySelector(".user-role");
+
+    if (avatar) {
+        avatar.textContent = getUserInitial(userName);
+    }
+
+    if (name) {
+        name.textContent = userName;
+    }
+
+    if (role) {
+        role.textContent = "Student";
+    }
+}
+
+function toggleUserMenu(event) {
+    event.stopPropagation();
+
+    const menu = document.querySelector(".user-menu");
+    const toggle = document.querySelector(".user-menu-toggle");
+
+    if (!menu || !toggle) {
+        return;
+    }
+
+    menu.classList.toggle("open");
+
+    const isOpen = menu.classList.contains("open");
+    toggle.setAttribute("aria-expanded", isOpen);
+}
+
+document.addEventListener("click", function(event) {
+    const menu = document.querySelector(".user-menu");
+
+    if (!menu) {
+        return;
+    }
+
+    if (!menu.contains(event.target)) {
+        menu.classList.remove("open");
+
+        const toggle = document.querySelector(".user-menu-toggle");
+
+        if (toggle) {
+            toggle.setAttribute("aria-expanded", "false");
+        }
+    }
+});
+
+async function joinTeamInBackend(requestId) {
+    await apiRequest(`/groups/invitations/${requestId}/accept`, "POST");
+    return true;
 }
 
 async function updateTeamInBackend(teamData) {
     try {
         const updateData = {
-            name: teamData.name,
-            projectId: teamData.projectId || 0,
-            isAccepted: teamData.applicationStatus === 'accepted'
+            name: teamData.name
         };
 
-        await apiRequest(`/groups/${teamData.id}`, 'PUT', updateData);
+        if (teamData.projectId != null) {
+            updateData.projectId = teamData.projectId;
+        }
+
+        if (teamData.size != null) {
+            updateData.maxMembers = teamData.size;
+        }
+
+        await apiRequest(`/groups/${teamData.id}`, "PUT", updateData);
         return true;
     } catch (error) {
-        console.error('Error updating team:', error);
+        console.error("Error updating team:", error);
         throw error;
     }
 }
 
 async function inviteStudentToBackend(email) {
-    try {
-        // Find student by email and add to group
-        const students = await apiRequest('/students');
-        const student = students?.find(s => s.email === email);
-        
-        if (!student) {
-            throw new Error('Student nie znaleziony');
-        }
-
-        await apiRequest(`/students/${student.id}/group`, 'PATCH', {
-            groupId: currentTeam.id
-        });
-        
-        return true;
-    } catch (error) {
-        console.error('Error inviting student:', error);
-        throw error;
+    if (!currentTeam?.id) {
+        throw new Error("Brak aktywnego zespołu.");
     }
+
+    await apiRequest(`/groups/${currentTeam.id}/invite`, "POST", {
+        email,
+        Email: email
+    });
+    return true;
 }
 
 async function removeStudentFromBackend(studentId) {
-    try {
-        // Remove student from group by setting groupId to null
-        await apiRequest(`/students/${studentId}/group`, 'PATCH', {
-            groupId: null
-        });
-        return true;
-    } catch (error) {
-        console.error('Error removing student:', error);
-        throw error;
-    }
+    await apiRequest(`/students/${studentId}/group`, "PATCH", {
+        groupId: null
+    });
+
+    return true;
 }
 
 async function applyTeamToProjectInBackend(projectId) {
-    try {
-        if (!currentTeam) return false;
-        
-        const updateData = {
-            name: currentTeam.name,
-            projectId: projectId,
-            isAccepted: false
-        };
+    if (!currentTeam) {
+        return false;
+    }
 
-        await apiRequest(`/groups/${currentTeam.id}`, 'PUT', updateData);
-        return true;
+    await apiRequest("/grouprequests", "POST", {
+        groupId: currentTeam.id,
+        projectId: projectId,
+        type: "ProjectRequest"
+    });
+    return true;
+}
+
+async function refreshTeamApplicationState() {
+    if (!currentTeam) {
+        return;
+    }
+
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!currentUser?.userId) {
+        return;
+    }
+
+    try {
+        const requests = await apiRequest(`/grouprequests/byUser/${currentUser.userId}`);
+        if (!Array.isArray(requests)) {
+            return;
+        }
+
+        const pendingRequest = requests.find(request => {
+            const groupId = request.groupId ?? request.GroupId;
+            const type = String(request.type ?? request.Type ?? "").toLowerCase();
+            const status = String(request.status ?? request.Status ?? "").toLowerCase();
+            return groupId === currentTeam.id
+                && type === "projectrequest"
+                && status === "pending";
+        });
+
+        if (pendingRequest) {
+            currentTeam.pendingProjectId = pendingRequest.projectId ?? pendingRequest.ProjectId;
+            currentTeam.applicationStatus = "pending";
+            return;
+        }
+
+        if (currentTeam.projectId) {
+            currentTeam.applicationStatus = "accepted";
+            currentTeam.pendingProjectId = null;
+        } else {
+            currentTeam.applicationStatus = "none";
+            currentTeam.pendingProjectId = null;
+        }
     } catch (error) {
-        console.error('Error applying to project:', error);
-        throw error;
+        console.error("Error refreshing application state:", error);
     }
 }
 
-async function saveCommentToBackend(commentData) {
-    try {
-        const payload = {
-            text: commentData.text,
-            projectId: currentProjectId,
-            authorId: studentData.id
-        };
-
-        const created = await apiRequest('/comments', 'POST', payload);
-        
-        return {
-            ...commentData,
-            id: created?.id
-        };
-    } catch (error) {
-        console.error('Error saving comment:', error);
-        throw error;
+function normalizeProjectDetails(raw) {
+    if (!raw) {
+        return null;
     }
+
+    return {
+        id: raw.id ?? raw.Id,
+        topic: raw.topic ?? raw.Topic ?? "",
+        companyName: raw.companyName ?? raw.CompanyName ?? "",
+        description: raw.description ?? raw.Description ?? "",
+        goal: raw.projectGoal ?? raw.ProjectGoal ?? "",
+        workScope: raw.workScope ?? raw.WorkScope ?? "",
+        techResources: raw.neededTechnologies ?? raw.NeededTechnologies ?? "",
+        teamSlots: raw.maxGroups ?? raw.MaxGroups ?? 0,
+        acceptedTeams: raw.currentGroupsCount ?? raw.CurrentGroupsCount ?? 0,
+        tags: raw.tags ?? raw.Tags ?? []
+    };
+}
+
+async function fetchProjectDetails(projectId) {
+    const raw = await apiRequest(`/projects/${projectId}/details`);
+    return normalizeProjectDetails(raw);
+}
+
+function normalizeCommentFromApi(raw) {
+    return {
+        id: raw.id ?? raw.Id,
+        projectId: raw.projectId ?? raw.ProjectId ?? currentProjectId,
+        teamId: raw.groupId ?? raw.GroupId ?? currentTeam?.id,
+        authorName: raw.groupName ?? raw.GroupName ?? raw.userName ?? raw.UserName ?? "",
+        text: raw.content ?? raw.Content ?? "",
+        createdAt: raw.createdAt ?? raw.CreatedAt,
+        responses: (raw.responses ?? raw.Responses ?? []).map(r => ({
+            id: r.id ?? r.Id,
+            authorName: r.userName ?? r.UserName ?? "Firma",
+            text: r.content ?? r.Content ?? "",
+            createdAt: r.createdAt ?? r.CreatedAt
+        }))
+    };
+}
+
+function resolveCommentProjectId() {
+    if (currentProjectId) {
+        return currentProjectId;
+    }
+
+    if (currentTeam?.projectId) {
+        return currentTeam.projectId;
+    }
+
+    if (currentTeam?.pendingProjectId) {
+        return currentTeam.pendingProjectId;
+    }
+
+    return null;
+}
+
+async function loadCommentsForTeam(projectId, groupId) {
+    const resolvedProjectId = projectId || resolveCommentProjectId();
+    if (!resolvedProjectId || !groupId) {
+        return [];
+    }
+
+    const data = await apiRequest(`/comments/project/${resolvedProjectId}/groups/${groupId}`);
+    return Array.isArray(data) ? data.map(normalizeCommentFromApi) : [];
+}
+
+async function saveCommentToBackend(text) {
+    const projectId = resolveCommentProjectId();
+    if (!projectId) {
+        throw new Error("Nie wybrano projektu — otwórz projekt lub sekcję „Twój projekt” i spróbuj ponownie.");
+    }
+
+    const created = await apiRequest("/comments", "POST", {
+        projectId,
+        content: text
+    });
+
+    return normalizeCommentFromApi({
+        ...created,
+        id: created?.id ?? created?.Id,
+        projectId,
+        groupId: currentTeam?.id,
+        groupName: currentTeam?.name
+    });
 }
 
 function setStudentData(data) {
@@ -611,6 +813,8 @@ function setStudentData(data) {
     } else {
         studentNameElement.textContent = "";
     }
+
+    setUserMenuData();
 }
 
 function showView(viewId, saveHistory = true) {
@@ -638,9 +842,9 @@ function goBack() {
 }
 
 function logout() {
-    localStorage.removeItem('jwt_token');
-    localStorage.removeItem('user_id');
-    window.location.href = 'index.html';
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "index.html";
 }
 
 function showTeamEntry() {
@@ -656,12 +860,22 @@ function showNotifications() {
     showView("notifications");
 }
 
+function normalizeNotification(raw) {
+    const status = raw.status ?? raw.Status;
+    return {
+        id: raw.id ?? raw.Id,
+        content: raw.content ?? raw.Content ?? raw.text ?? "",
+        isRead: (raw.isRead ?? raw.IsRead ?? (status === "Read" || status === 1)) === true,
+        createdAt: raw.createdAt ?? raw.CreatedAt
+    };
+}
+
 function renderNotifications() {
     const allNotifications = document.getElementById("allNotifications");
 
     allNotifications.innerHTML = "";
 
-    if (!currentTeam || notifications.length === 0) {
+    if (notifications.length === 0) {
         allNotifications.innerHTML = "<p class='empty-state'>Brak powiadomień do wyświetlenia.</p>";
         return;
     }
@@ -674,7 +888,10 @@ function renderNotifications() {
 function createNotification(notification) {
     const item = document.createElement("div");
     item.className = "notification-item";
-    item.textContent = notification.text || "";
+    if (!notification.isRead) {
+        item.classList.add("notification-unread");
+    }
+    item.textContent = notification.content || notification.text || "";
     return item;
 }
 
@@ -699,27 +916,19 @@ async function createTeam(event) {
     try {
         const teamData = {
             name: name,
-            projectId: 0,
-            isAccepted: false,
-            leaderId: studentData.id
+            size: size,
+            leaderId: studentData.id,
+            maxMembers: size
         };
 
-        const createdTeam = await apiRequest('/groups', 'POST', teamData);
-        
-        if (!createdTeam) {
-            throw new Error('Failed to create team');
-        }
-
-        // Add student to the newly created group
-        await apiRequest(`/students/${studentData.id}/group`, 'PATCH', {
-            groupId: createdTeam.id
-        });
+        const createdTeam = await saveTeamToBackend(teamData);
 
         currentTeam = {
             id: createdTeam.id,
             name: createdTeam.name,
+            size: teamData.maxMembers,
             projectId: createdTeam.projectId,
-            applicationStatus: createdTeam.isAccepted ? 'accepted' : 'none',
+            applicationStatus: createdTeam.isAccepted ? "accepted" : "none",
             leaderId: createdTeam.leaderId,
             members: [{
                 id: studentData.id,
@@ -734,12 +943,12 @@ async function createTeam(event) {
         event.target.reset();
         message.textContent = "Zespół został pomyślnie utworzony!";
         message.className = "form-message success";
-        
+
         setTimeout(() => {
             showView("dashboard");
         }, 1000);
     } catch (error) {
-        message.textContent = `Nie udało się utworzyć zespół: ${error.message}`;
+        message.textContent = `Nie udało się utworzyć zespołu: ${error.message}`;
         message.className = "form-message error";
     }
 }
@@ -751,19 +960,18 @@ function showJoinTeam() {
 
 async function loadInvitedTeams() {
     try {
-        // Fetch all groups
-        const groups = await apiRequest('/groups');
-        if (!groups) return;
-
-        // Filter groups where student is not already a member
-        invitedTeams = groups.filter(group => {
-            // Check if student is not in this group
-            return !group.members?.some(m => m.id === studentData.id);
-        });
-
+        const invitations = await apiRequest("/groups/my-invitations");
+        invitedTeams = (Array.isArray(invitations) ? invitations : []).map(item => ({
+            id: item.groupId ?? item.GroupId,
+            requestId: item.requestId ?? item.RequestId,
+            name: item.groupName ?? item.GroupName ?? "",
+            size: item.maxMembers ?? item.MaxMembers ?? 0,
+            memberCount: item.memberCount ?? item.MemberCount ?? 0
+        }));
         renderInvitedTeams();
     } catch (error) {
-        console.error('Error loading invited teams:', error);
+        console.error("Error loading invited teams:", error);
+        invitedTeams = [];
         renderInvitedTeams();
     }
 }
@@ -784,11 +992,11 @@ function renderInvitedTeams() {
         card.innerHTML = `
             <div class="team-main">
                 <strong>${escapeHtml(team.name || "")}</strong>
-                <span>Liczba miejsc: ${team.members?.length || 0}/${team.size || 0}</span>
+                <span>Liczba miejsc: ${team.memberCount ?? 0}/${team.size || "?"}</span>
             </div>
 
             <div class="team-actions">
-                <button onclick="joinTeam(${team.id})">Dołącz do zespołu</button>
+                <button onclick="joinTeam(${team.requestId})">Dołącz do zespołu</button>
             </div>
         `;
 
@@ -796,47 +1004,54 @@ function renderInvitedTeams() {
     });
 }
 
-async function joinTeam(teamId) {
+async function joinTeam(requestId) {
     if (currentTeam) {
+        alert("Należysz już do zespołu. Student może być tylko w jednym zespole na raz.");
+        return;
+    }
+
+    if (!requestId) {
+        alert("Brak identyfikatora zaproszenia.");
         return;
     }
 
     try {
-        await joinTeamInBackend(teamId);
+        await joinTeamInBackend(requestId);
 
-        const team = invitedTeams.find(item => item.id === teamId);
+        const invitation = invitedTeams.find(item => item.requestId === requestId);
+        const groupId = invitation?.id;
+        if (!groupId) {
+            await loadInitialData();
+            showView("dashboard");
+            return;
+        }
 
-        if (!team) {
-            throw new Error('Team not found');
+        const group = await apiRequest(`/groups/${groupId}/summary`);
+
+        if (!group) {
+            throw new Error("Team not found");
         }
 
         currentTeam = {
-            id: team.id,
-            name: team.name,
-            projectId: team.projectId,
-            applicationStatus: team.isAccepted ? 'accepted' : 'none',
-            leaderId: team.leaderId,
-            members: [
-                ...(team.members || []).map(m => ({
-                    id: m.id,
-                    fullName: m.fullName || `${m.user?.name || ''} ${m.user?.surname || ''}`.trim(),
-                    email: m.email,
-                    role: m.id === team.leaderId ? 'leader' : 'member'
-                })),
-                {
-                    id: studentData.id,
-                    fullName: studentData.fullName,
-                    email: studentData.email,
-                    role: "member"
-                }
-            ]
+            id: group.id,
+            name: group.name,
+            projectId: group.projectId,
+            size: group.maxMembers ?? (group.members?.length || 0),
+            applicationStatus: group.isAccepted ? (group.projectId ? "accepted" : "pending") : "none",
+            leaderId: group.leaderId,
+            members: group.members?.map(m => ({
+                id: m.id,
+                fullName: m.userName || "",
+                email: m.email || "",
+                role: m.id === group.leaderId ? "leader" : "member"
+            })) || []
         };
 
         studentData.teamId = currentTeam.id;
 
         showView("dashboard");
     } catch (error) {
-        console.error('Error joining team:', error);
+        console.error("Error joining team:", error);
         alert(`Nie udało się dołączyć do zespołu: ${error.message}`);
     }
 }
@@ -875,7 +1090,7 @@ function renderTeamMembers() {
         return;
     }
 
-    const membersToDisplay = isLeader ? currentTeam.size : currentTeam.members.length;
+    const membersToDisplay = isLeader ? (currentTeam.size || currentTeam.members.length) : currentTeam.members.length;
 
     for (let i = 0; i < membersToDisplay; i++) {
         const member = currentTeam.members[i];
@@ -936,7 +1151,13 @@ async function inviteStudent(event) {
     const message = document.getElementById("inviteMessage");
 
     if (!isValidEmail(email)) {
-        message.textContent = "Nie zaproszono studenta. Podaj poprawny mail studencki.";
+        message.textContent = "Podaj poprawny adres e-mail.";
+        message.className = "form-message error";
+        return;
+    }
+
+    if (!isAllowedStudentEmail(email)) {
+        message.textContent = "Można zapraszać tylko adresy @g.elearn.uz.zgora.pl lub @stud.uz.zgora.pl.";
         message.className = "form-message error";
         return;
     }
@@ -948,7 +1169,7 @@ async function inviteStudent(event) {
         message.className = "form-message success";
 
         document.getElementById("inviteEmail").value = "";
-        
+
         setTimeout(() => {
             goBack();
         }, 1500);
@@ -986,7 +1207,7 @@ async function confirmRemoveStudent() {
 
         showMyTeam();
     } catch (error) {
-        console.error('Error removing student:', error);
+        console.error("Error removing student:", error);
         alert(`Nie udało się usunąć studenta: ${error.message}`);
     }
 }
@@ -1022,12 +1243,12 @@ async function confirmEditTeam(event) {
 
         message.textContent = "Zespół został zaktualizowany.";
         message.className = "form-message success";
-        
+
         setTimeout(() => {
             showMyTeam();
         }, 1000);
     } catch (error) {
-        message.textContent = `Nie udało się edytować zespół: ${error.message}`;
+        message.textContent = `Nie udało się edytować zespołu: ${error.message}`;
         message.className = "form-message error";
     }
 }
@@ -1056,7 +1277,7 @@ function showStudentProject() {
                 <p class="muted">${escapeHtml(project?.companyName || "")}</p>
 
                 <div class="quick-actions inside-card-actions">
-                    <button onclick="showProjectComments()">Komentarze</button>
+                    <button onclick="openTeamProjectComments()">Komentarze</button>
                     <button onclick="showProjectGuidelines(${currentTeam.projectId})">Wytyczne</button>
                     <button onclick="showRepository()">Repozytorium</button>
                 </div>
@@ -1121,13 +1342,20 @@ function createProjectCard(project) {
     return card;
 }
 
-function showSelectedProject(projectId) {
+async function showSelectedProject(projectId) {
     currentProjectId = projectId;
 
-    const project = availableProjects.find(item => item.id === projectId);
-
-    if (!project) {
+    const summary = availableProjects.find(item => item.id === projectId);
+    if (!summary) {
         return;
+    }
+
+    const details = await fetchProjectDetails(projectId);
+    const project = details ? { ...summary, ...details } : summary;
+
+    const listIndex = availableProjects.findIndex(item => item.id === projectId);
+    if (listIndex !== -1 && details) {
+        availableProjects[listIndex] = { ...availableProjects[listIndex], ...details };
     }
 
     const status = getProjectApplicationStatus(projectId);
@@ -1179,51 +1407,94 @@ async function applyTeamToProject(projectId) {
     try {
         await applyTeamToProjectInBackend(projectId);
 
-        currentTeam.projectId = projectId;
+        currentTeam.pendingProjectId = projectId;
         currentTeam.applicationStatus = "pending";
 
         showSelectedProject(projectId);
     } catch (error) {
-        console.error('Error applying to project:', error);
-        alert(`Nie udało się złożyć zgłoszenie: ${error.message}`);
+        console.error("Error applying to project:", error);
+        alert(`Nie udało się złożyć zgłoszenia: ${error.message}`);
     }
 }
 
 function getProjectApplicationStatus(projectId) {
-    if (!currentTeam || currentTeam.projectId !== projectId) {
+    if (!currentTeam) {
         return "none";
     }
 
-    return currentTeam.applicationStatus || "none";
-}
-
-function showProjectComments() {
-    const list = document.getElementById("projectCommentsList");
-    const commentMessage = document.getElementById("commentMessage");
-
-    commentMessage.textContent = "";
-    list.innerHTML = "";
-
-    const commentsForProject = projectComments.filter(comment => {
-        return comment.projectId === currentProjectId && comment.teamId === currentTeam?.id;
-    });
-
-    if (commentsForProject.length === 0) {
-        list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
-    } else {
-        commentsForProject.forEach(comment => {
-            const item = document.createElement("div");
-            item.className = "comment-item";
-            item.innerHTML = `
-                <strong>${escapeHtml(comment.authorName || "")}</strong>
-                <p>${escapeHtml(comment.text || "")}</p>
-            `;
-
-            list.appendChild(item);
-        });
+    if (currentTeam.projectId === projectId) {
+        return "accepted";
     }
 
+    if (currentTeam.pendingProjectId === projectId && currentTeam.applicationStatus === "pending") {
+        return "pending";
+    }
+
+    return "none";
+}
+
+function renderStudentCommentItem(comment) {
+    const item = document.createElement("div");
+    item.className = "comment-item";
+
+    const responsesHtml = (comment.responses || []).map(response => `
+        <div class="comment-reply">
+            <strong>${escapeHtml(response.authorName || "Firma")}</strong>
+            <p>${escapeHtml(response.text || "")}</p>
+        </div>
+    `).join("");
+
+    item.innerHTML = `
+        <p>${escapeHtml(comment.text || "")}</p>
+        ${responsesHtml ? `<div class="comment-replies">${responsesHtml}</div>` : ""}
+    `;
+
+    return item;
+}
+
+function openTeamProjectComments() {
+    if (currentTeam?.projectId) {
+        currentProjectId = currentTeam.projectId;
+    }
+
+    showProjectComments();
+}
+
+async function showProjectComments() {
+    const list = document.getElementById("projectCommentsList");
+    const commentMessage = document.getElementById("commentMessage");
+    const projectId = resolveCommentProjectId();
+
+    commentMessage.textContent = "";
+    list.innerHTML = "<p class='empty-state'>Ładowanie komentarzy...</p>";
     showView("projectComments");
+
+    if (!currentTeam?.id) {
+        list.innerHTML = "<p class='empty-state'>Dołącz do zespołu, aby pisać komentarze.</p>";
+        return;
+    }
+
+    if (!projectId) {
+        list.innerHTML = "<p class='empty-state'>Nie wybrano projektu — otwórz szczegóły projektu lub sekcję „Twój projekt”.</p>";
+        return;
+    }
+
+    currentProjectId = projectId;
+
+    try {
+        projectComments = await loadCommentsForTeam(projectId, currentTeam.id);
+        list.innerHTML = "";
+
+        if (projectComments.length === 0) {
+            list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu w Twoim zespole.</p>";
+        } else {
+            projectComments.forEach(comment => {
+                list.appendChild(renderStudentCommentItem(comment));
+            });
+        }
+    } catch (error) {
+        list.innerHTML = `<p class='empty-state'>Nie udało się załadować komentarzy: ${escapeHtml(error.message)}</p>`;
+    }
 }
 
 async function addComment() {
@@ -1236,42 +1507,34 @@ async function addComment() {
         return;
     }
 
+    if (!currentTeam?.id) {
+        message.textContent = "Musisz należeć do zespołu, aby dodać komentarz.";
+        message.className = "form-message error";
+        return;
+    }
+
     try {
-        const commentData = {
-            text: text,
-            projectId: currentProjectId,
-            authorId: studentData.id
-        };
-
-        const savedComment = await saveCommentToBackend(commentData);
-
-        if (savedComment) {
-            projectComments.unshift({
-                id: savedComment.id,
-                projectId: currentProjectId,
-                teamId: currentTeam?.id,
-                authorName: currentTeam?.name || "",
-                text: text
-            });
-        }
+        await saveCommentToBackend(text);
 
         document.getElementById("newCommentText").value = "";
         message.textContent = "Komentarz został dodany.";
         message.className = "form-message success";
-        
-        showProjectComments();
+
+        await showProjectComments();
     } catch (error) {
-        message.textContent = `Nie udało się dodać komentarz: ${error.message}`;
+        message.textContent = `Nie udało się dodać komentarza: ${error.message}`;
         message.className = "form-message error";
     }
 }
 
-function showProjectGuidelines(projectId = currentProjectId) {
-    const project = availableProjects.find(item => item.id === projectId);
-
-    if (!project) {
+async function showProjectGuidelines(projectId = currentProjectId) {
+    const summary = availableProjects.find(item => item.id === projectId);
+    if (!summary) {
         return;
     }
+
+    const details = await fetchProjectDetails(projectId);
+    const project = details ? { ...summary, ...details } : summary;
 
     document.getElementById("guidelinesTopic").textContent = project.topic || "";
     document.getElementById("guidelinesCompany").textContent = project.companyName || "";
@@ -1301,40 +1564,205 @@ function renderGuidelineTags(tags) {
     });
 }
 
-function showRepository() {
-    renderRepositoryFiles();
+async function showRepository() {
     showView("repository");
+    await loadRepositoryFiles();
+}
+
+async function loadRepositoryFiles() {
+    const fileList = document.getElementById("repositoryFiles");
+    fileList.innerHTML = "<li class='empty-state'>Ładowanie plików...</li>";
+
+    if (!currentTeam?.id) {
+        fileList.innerHTML = "<li class='empty-state'>Najpierw dołącz do zespołu.</li>";
+        repositoryFiles = [];
+        return;
+    }
+
+    try {
+        const data = await apiRequest("/files");
+        repositoryFiles = Array.isArray(data) ? data : [];
+        renderRepositoryFiles();
+    } catch (error) {
+        console.error("Błąd pobierania plików:", error);
+        fileList.innerHTML = `<li class='empty-state'>Nie udało się pobrać plików: ${escapeHtml(error.message || "")}</li>`;
+        repositoryFiles = [];
+    }
 }
 
 function renderRepositoryFiles() {
     const fileList = document.getElementById("repositoryFiles");
-
     fileList.innerHTML = "";
 
-    if (repositoryFiles.length === 0) {
+    if (!repositoryFiles || repositoryFiles.length === 0) {
         fileList.innerHTML = "<li class='empty-state'>Brak plików do wyświetlenia.</li>";
         return;
     }
 
     repositoryFiles.forEach(file => {
         const li = document.createElement("li");
-        li.textContent = file.name || "";
+        li.className = "file-item";
+
+        const fileName = file.fileName || file.FileName || "(bez nazwy)";
+        const uploadDate = file.uploadDate || file.UploadDate || "";
+        const dateLabel = uploadDate ? new Date(uploadDate).toLocaleString("pl-PL") : "";
+
+        const info = document.createElement("div");
+        info.className = "file-info";
+        info.innerHTML = `
+            <span class="file-name">${escapeHtml(fileName)}</span>
+            ${dateLabel ? `<span class="file-meta">${escapeHtml(dateLabel)}</span>` : ""}
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "file-actions";
+
+        const downloadBtn = document.createElement("button");
+        downloadBtn.type = "button";
+        downloadBtn.className = "file-action-btn";
+        downloadBtn.textContent = "Pobierz";
+        downloadBtn.onclick = () => downloadRepositoryFile(file.id || file.Id, fileName);
+        actions.appendChild(downloadBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "file-action-btn danger";
+        deleteBtn.textContent = "Usuń";
+        deleteBtn.onclick = () => deleteRepositoryFile(file.id || file.Id, fileName);
+        actions.appendChild(deleteBtn);
+
+        li.appendChild(info);
+        li.appendChild(actions);
         fileList.appendChild(li);
     });
 }
 
+async function handleFileUpload(event) {
+    const input = event.target;
+    const files = Array.from(input.files || []);
+    const message = document.getElementById("repositoryUploadMessage");
+
+    if (files.length === 0) return;
+
+    if (!currentTeam?.id) {
+        message.textContent = "Musisz należeć do zespołu, aby wysyłać pliki.";
+        message.className = "form-message error";
+        input.value = "";
+        return;
+    }
+
+    message.textContent = `Wysyłanie ${files.length} plik(ów)...`;
+    message.className = "form-message";
+
+    let okCount = 0;
+    let failed = [];
+
+    for (const file of files) {
+        try {
+            await uploadRepositoryFile(file);
+            okCount++;
+        } catch (error) {
+            console.error("Błąd przesyłania pliku:", error);
+            failed.push(`${file.name}: ${error.message}`);
+        }
+    }
+
+    input.value = "";
+
+    if (failed.length === 0) {
+        message.textContent = `Wysłano ${okCount} plik(ów).`;
+        message.className = "form-message success";
+    } else {
+        message.textContent = `Wysłano ${okCount}/${files.length} plik(ów). Błędy: ${failed.join("; ")}`;
+        message.className = "form-message error";
+    }
+
+    await loadRepositoryFiles();
+}
+
+async function uploadRepositoryFile(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_URL}/files/upload`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${getAuthToken()}`
+        },
+        body: formData
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        let parsed = null;
+        try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* not json */ }
+        const msg = parsed?.error || parsed?.message || text || `HTTP ${response.status}`;
+        throw new Error(msg);
+    }
+
+    return await response.json();
+}
+
+async function downloadRepositoryFile(fileId, fileName) {
+    if (!fileId) return;
+
+    try {
+        const data = await apiRequest(`/files/download/${fileId}`);
+        if (!data?.url) {
+            throw new Error("Brak adresu do pobrania pliku.");
+        }
+
+        const link = document.createElement("a");
+        link.href = data.url;
+        link.download = fileName || "";
+        link.rel = "noopener";
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (error) {
+        console.error("Błąd pobierania pliku:", error);
+        alert(`Nie udało się pobrać pliku: ${error.message}`);
+    }
+}
+
+async function deleteRepositoryFile(fileId, fileName) {
+    if (!fileId) return;
+    if (!confirm(`Usunąć plik „${fileName || ""}”?`)) return;
+
+    try {
+        await apiRequest(`/files/${fileId}`, "DELETE");
+        await loadRepositoryFiles();
+    } catch (error) {
+        console.error("Błąd usuwania pliku:", error);
+        alert(`Nie udało się usunąć pliku: ${error.message}`);
+    }
+}
+
 function isCurrentStudentLeader() {
-    if (!currentTeam || !currentTeam.members) {
+    if (!currentTeam || !currentTeam.leaderId || studentData.id == null) {
         return false;
     }
 
-    const currentMember = currentTeam.members.find(member => member.id === studentData.id);
-
-    return currentMember?.role === "leader";
+    return currentTeam.leaderId === studentData.id;
 }
+
+const ALLOWED_STUDENT_EMAIL_DOMAINS = [
+    "g.elearn.uz.zgora.pl",
+    "stud.uz.zgora.pl"
+];
 
 function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isAllowedStudentEmail(email) {
+    if (!isValidEmail(email)) {
+        return false;
+    }
+
+    const domain = email.trim().toLowerCase().split("@").pop();
+    return ALLOWED_STUDENT_EMAIL_DOMAINS.includes(domain);
 }
 
 function escapeHtml(value) {
@@ -1346,6 +1774,7 @@ function escapeHtml(value) {
         .replaceAll("'", "&#039;");
 }
 
+setUserMenuData();
 loadInitialData();
 </script>
 

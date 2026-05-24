@@ -37,6 +37,11 @@ namespace wspolpracujmy.Services
                     UserId = c.UserId,
                     UserName = c.User.Name + " " + c.User.Surname,
                     GroupId = _db.Students.Where(s => s.UserId == c.UserId).Select(s => (int?)s.GroupId).FirstOrDefault(),
+                    GroupName = _db.Students
+                        .Where(s => s.UserId == c.UserId && s.GroupId != null)
+                        .Select(s => s.Group!.Name)
+                        .FirstOrDefault(),
+                    ProjectId = c.ProjectId,
                     Content = c.Content,
                     CreatedAt = c.CreatedAt,
                     Responses = c.Responses.Select(r => new ResponseDto
@@ -70,6 +75,11 @@ namespace wspolpracujmy.Services
                     UserId = c.UserId,
                     UserName = c.User.Name + " " + c.User.Surname,
                     GroupId = _db.Students.Where(s => s.UserId == c.UserId).Select(s => (int?)s.GroupId).FirstOrDefault(),
+                    GroupName = _db.Students
+                        .Where(s => s.UserId == c.UserId && s.GroupId != null)
+                        .Select(s => s.Group!.Name)
+                        .FirstOrDefault(),
+                    ProjectId = c.ProjectId,
                     Content = c.Content,
                     CreatedAt = c.CreatedAt,
                     Responses = c.Responses.Select(r => new ResponseDto

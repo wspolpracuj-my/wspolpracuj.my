@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace wspolpracujmy.Models
@@ -11,6 +13,30 @@ namespace wspolpracujmy.Models
     /// </summary>
     public class Group
     {
+        public static readonly string[] AllowedStudentEmailDomains =
+        {
+            "g.elearn.uz.zgora.pl",
+            "stud.uz.zgora.pl"
+        };
+
+        public static bool IsAllowedStudentEmail(string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            var atIndex = email.LastIndexOf('@');
+            if (atIndex < 0 || atIndex == email.Length - 1)
+                return false;
+
+            var domain = email[(atIndex + 1)..].Trim().ToLowerInvariant();
+            return AllowedStudentEmailDomains.Any(d => domain == d);
+        }
+
+        public static string NormalizeStudentEmail(string email)
+            => email.Trim().ToLowerInvariant();
+
+        public static bool StudentBelongsToTeam(Student? student)
+            => student?.GroupId != null;
         [Key]
         [Column("id")]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]

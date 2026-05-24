@@ -10,8 +10,14 @@ using BCrypt.Net;
 
 namespace wspolpracujmy.Data
 {
+    /// <summary>
+    /// Seeder przygotowujący przykładowe dane testowe dla środowiska developerskiego.
+    /// </summary>
     public static class TestDataSeeder
     {
+        /// <summary>
+        /// Wypełnia bazę danych zestawem danych testowych.
+        /// </summary>
         public static async Task SeedAsync(WebApplication app)
         {
             using var scope = app.Services.CreateScope();
@@ -31,34 +37,39 @@ namespace wspolpracujmy.Data
                 logger.LogWarning(ex, "Failed to run GroupRequests.status cleanup; continuing.");
             }
 
-            // avoid seeding when an admin already exists
-            if (await context.Users.AnyAsync(u => u.Role == Role.Admin))
+            // Always ensure that the admin account exists (independent of full test seeding).
+            try
             {
-                logger.LogInformation("Test seeder skipped: admin user already exists.");
+                var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Login == "admin");
+                if (existingAdmin == null)
+                {
+                    var admin = new User
+                    {
+                        Name = "Admin",
+                        Surname = "Systemu",
+                        Role = Role.Admin,
+                        Login = "admin",
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin")
+                    };
+                    context.Users.Add(admin);
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Seeded default admin user (login: admin).");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to ensure admin user exists; continuing.");
+            }
+
+            // avoid seeding when data already present
+            if (await context.Users.CountAsync() > 1)
+            {
+                logger.LogInformation("Test seeder skipped: Users already exist.");
                 return;
             }
 
             await context.Database.OpenConnectionAsync();
             await using var tx = await context.Database.BeginTransactionAsync();
-            
-            if (await context.Users.AnyAsync())
-            {
-                logger.LogInformation("Database contains users but no Admin account; seeding admin user only.");
-                var adminUser = new User
-                {
-                    Name = "Admin",
-                    Surname = "Admin",
-                    Role = Role.Admin,
-                    Login = "admin",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin")
-                };
-
-                await context.Users.AddAsync(adminUser);
-                await context.SaveChangesAsync();
-                await tx.CommitAsync();
-                logger.LogInformation("Admin user seeded into existing database.");
-                return;
-            }
 
             // defer constraints so we can insert circular/related rows in one transaction
             await context.Database.ExecuteSqlRawAsync("SET CONSTRAINTS ALL DEFERRED;");
@@ -74,8 +85,7 @@ namespace wspolpracujmy.Data
                 // Additional test users: one student without a group, and one company without projects
                 var u6 = new User { Id = 6, Name = "Student", Surname = "NoGroup", Role = Role.Student, Login = "student4", PasswordHash = BCrypt.Net.BCrypt.HashPassword("student4") };
                 var u7 = new User { Id = 7, Name = "SoloCompany", Surname = "NoProject", Role = Role.Company, Login = "firma3", PasswordHash = BCrypt.Net.BCrypt.HashPassword("firma3") };
-                var u8 = new User { Id = 8, Name = "Admin", Surname = "Admin", Role = Role.Admin, Login = "admin", PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin") };
-                await context.Users.AddRangeAsync(u1, u2, u3, u4, u5, u6, u7, u8);
+                await context.Users.AddRangeAsync(u1, u2, u3, u4, u5, u6, u7);
 
                 // Companies
                 var c1 = new Company { Id = 1, UserId = 1, CompanyName = "Firma Innowacji", ContactEmail = "contact@firma1.example", User = u1 };

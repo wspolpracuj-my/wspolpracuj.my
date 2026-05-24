@@ -16,14 +16,5 @@ namespace wspolpracujmy.DTOs
 
         [StringLength(320)]
         public string? ContactEmail { get; set; }
-
-        // For admin-only creation: require password confirmation
-        [Required]
-        [StringLength(200, MinimumLength = 6)]
-        public string Password { get; set; } = string.Empty;
-
-        [Required]
-        [StringLength(200, MinimumLength = 6)]
-        public string PasswordConfirm { get; set; } = string.Empty;
     }
 }

@@ -10,8 +10,8 @@ namespace wspolpracujmy.DTOs
         [Required]
         public int CommentId { get; set; }
 
-        [Required]
-        public int UserId { get; set; }
+        /// <summary>Ustawiane po stronie serwera z tokena JWT.</summary>
+        public int? UserId { get; set; }
 
         [Required]
         [StringLength(2000)]

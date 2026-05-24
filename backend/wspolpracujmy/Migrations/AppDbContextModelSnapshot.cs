@@ -423,10 +423,49 @@ namespace wspolpracujmy.Migrations
                     b.ToTable("Project", (string)null);
                 });
 
+            modelBuilder.Entity("wspolpracujmy.Models.ProjectFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("content_type");
+
+                    b.Property<string>("GcsObjectName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("gcs_object_name");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("original_file_name");
+
+                    b.Property<int>("TeamId")
+                        .HasColumnType("integer")
+                        .HasColumnName("team_id");
+
+                    b.Property<DateTime>("UploadDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("upload_date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("ProjectFiles", (string)null);
+                });
+
             modelBuilder.Entity("wspolpracujmy.Models.ProjectTag", b =>
                 {
                     b.Property<int>("ProjectId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasColumnName("project_id");
 
@@ -732,6 +771,15 @@ namespace wspolpracujmy.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("MeetingType");
+                });
+
+            modelBuilder.Entity("wspolpracujmy.Models.ProjectFile", b =>
+                {
+                    b.HasOne("wspolpracujmy.Models.Group", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("wspolpracujmy.Models.ProjectTag", b =>

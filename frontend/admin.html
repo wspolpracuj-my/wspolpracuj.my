@@ -20,8 +20,17 @@
             <div class="user-menu">
                 <button class="user-menu-toggle" onclick="toggleUserMenu(event)" aria-expanded="false">
                     <span class="user-avatar">A</span>
-                    <span class="user-name">Admin</span>
-                    <span class="user-arrow">⌄</span>
+
+                    <span class="user-info">
+                        <span class="user-name">Admin</span>
+                        <span class="user-role">Admin</span>
+                    </span>
+
+                    <span class="hamburger-icon" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
                 </button>
 
                 <div id="userDropdown" class="user-dropdown">
@@ -33,15 +42,83 @@
         <section id="dashboard" class="view active-view">
             <div class="admin-start-box">
                 <p class="small-label">Panel administratora</p>
-                <h1>Cześć, admin</h1>
+                <h1>Cześć<span id="dashboardUserName">, admin</span></h1>
 
                 <div class="admin-menu-grid">
+                    <button onclick="showAdminDashboard()">DASHBOARD</button>
                     <button onclick="showStudents()">STUDENCI</button>
                     <button onclick="showTeams()">ZESPOŁY</button>
                     <button onclick="showCompanies()">FIRMY</button>
                     <button onclick="showProjects()">PROJEKTY</button>
                     <button onclick="showNotifications()">POWIADOMIENIA</button>
                 </div>
+            </div>
+        </section>
+
+        <section id="adminDashboard" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="dashboard-choice-card">
+                <button class="dashboard-choice-button" onclick="showActiveProjects()">
+                    <span class="dashboard-choice-icon folder-icon"></span>
+                    <span>AKTYWNE PROJEKTY</span>
+                    <span class="dashboard-choice-arrow">›</span>
+                </button>
+
+                <button class="dashboard-choice-button" onclick="showStatistics()">
+                    <span class="dashboard-choice-icon stats-icon"></span>
+                    <span>STATYSTYKI</span>
+                    <span class="dashboard-choice-arrow">›</span>
+                </button>
+            </div>
+        </section>
+
+        <section id="activeProjects" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Aktywne projekty</h2>
+                    <p class="muted">Lista wszystkich projektów na platformie.</p>
+                </div>
+            </div>
+
+            <div id="activeProjectsList" class="active-projects-box scroll-list"></div>
+        </section>
+
+        <section id="statistics" class="view">
+            <button class="back-btn" onclick="goBack()">← Wstecz</button>
+
+            <div class="section-title-row">
+                <div>
+                    <h2>Statystyki</h2>
+                    <p class="muted">Przegląd danych projektowych i firmowych.</p>
+                </div>
+            </div>
+
+            <div class="statistics-layout">
+                <section class="stats-card filled-projects-card">
+                    <div class="stats-card-header">
+                        <div>
+                            <h3>Zapełnione projekty</h3>
+                            <p>Projekty, w których liczba zajętych miejsc jest równa liczbie dostępnych miejsc.</p>
+                        </div>
+
+                        <strong id="filledProjectsCounter" class="stats-counter">0</strong>
+                    </div>
+
+                    <div id="filledProjectsList" class="filled-projects-list"></div>
+                </section>
+
+                <section class="stats-card">
+                    <h3>Obciążone firmy wg. liczby projektów</h3>
+                    <div id="companiesByProjectsChart" class="podium-chart"></div>
+                </section>
+
+                <section class="stats-card">
+                    <h3>Obciążone firmy wg. liczby zespołów</h3>
+                    <div id="companiesByTeamsChart" class="podium-chart"></div>
+                </section>
             </div>
         </section>
 
@@ -312,7 +389,8 @@
                         Miejsce na wrzucanie plików z rozszerzeniami według dokumentacji.
                     </p>
 
-                    <input type="file" multiple>
+                    <input id="repositoryFileInput" type="file" multiple onchange="handleAdminFileUpload(event)">
+                    <p id="repositoryUploadMessage" class="form-message"></p>
                 </div>
 
                 <ul id="repositoryFiles" class="file-list"></ul>
@@ -323,9 +401,10 @@
 </div>
 
 <script>
+const API_BASE = "http://localhost:8081/api";
+
 let currentProjectId = null;
 let currentTeamId = null;
-let currentProjectDetails = null;
 
 let deleteData = {
     type: null,
@@ -335,22 +414,12 @@ let deleteData = {
 
 const viewHistory = [];
 
-const API_BASE = "http://localhost:8081/api";
-const authToken = localStorage.getItem("token");
-const currentUser = safeParseJson(localStorage.getItem("user"));
-
 let students = [];
-
 let companies = [];
-
 let projects = [];
-
 let teams = [];
-
 let notifications = [];
-
 let comments = [];
-
 let repositoryFiles = [];
 
 const priorityLabels = {
@@ -361,154 +430,372 @@ const priorityLabels = {
     5: "5 - bardzo wysoki"
 };
 
-function safeParseJson(value) {
+const PRIORITY_NUMERIC = {
+    P1: 1, P2: 2, P3: 3, P4: 4, P5: 5
+};
+
+const MEETING_TYPE_LABELS = {
+    1: "Online",
+    2: "Stacjonarne",
+    3: "Hybrydowe"
+};
+
+function getAuthHeaders() {
+    const token = localStorage.getItem("token");
+    return {
+        "Content-Type": "application/json",
+        "Authorization": token ? `Bearer ${token}` : ""
+    };
+}
+
+function checkAuth() {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (!token || !user || (user.role !== "Admin" && user.role !== 0)) {
+        window.location.href = "index.html";
+        return false;
+    }
+    return true;
+}
+
+function isUnauthorized(res) {
+    if (res.status === 401 || res.status === 403) {
+        return true;
+    }
+    return false;
+}
+
+function handleUnauthorized(res) {
+    if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "index.html";
+        return true;
+    }
+    return false;
+}
+
+async function apiFetch(url, options = {}) {
+    const opts = {
+        ...options,
+        headers: {
+            ...getAuthHeaders(),
+            ...(options.headers || {})
+        }
+    };
+    const res = await fetch(url, opts);
+    if (handleUnauthorized(res)) {
+        throw new Error("Unauthorized");
+    }
+    return res;
+}
+
+function normalizePriority(value) {
+    if (typeof value === "number") return value;
+    if (typeof value === "string" && PRIORITY_NUMERIC[value]) {
+        return PRIORITY_NUMERIC[value];
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapAcceptanceStatus(value) {
+    if (value === 1 || value === "Accepted" || value === "accepted") return "accepted";
+    if (value === 2 || value === "Declined" || value === "declined") return "rejected";
+    if (value === 3 || value === "Cancelled" || value === "cancelled") return "rejected";
+    return "pending";
+}
+
+async function loadInitialData() {
+    if (!checkAuth()) return;
+
+    await Promise.all([
+        loadStudents(),
+        loadCompanies(),
+        loadProjects(),
+        loadTeams(),
+        loadNotifications()
+    ]);
+
+    renderStudents();
+    renderCompanies();
+    renderProjects();
+    renderTeams();
+    renderNotifications();
+}
+
+async function loadStudents() {
     try {
-        return JSON.parse(value);
-    } catch {
+        const res = await apiFetch(`${API_BASE}/students`);
+        if (!res.ok) {
+            students = [];
+            return;
+        }
+        const data = await res.json();
+        students = (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            userId: item.userId,
+            fullName: item.fullName || "",
+            email: item.email || "",
+            login: item.login || "",
+            groupId: item.groupId ?? null,
+            groupName: item.groupName ?? null
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania studentów:", err);
+        students = [];
+    }
+}
+
+async function loadCompanies() {
+    try {
+        const res = await apiFetch(`${API_BASE}/companies`);
+        if (!res.ok) {
+            companies = [];
+            return;
+        }
+        const data = await res.json();
+        companies = (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            userId: item.userId,
+            name: item.companyName || "",
+            login: item.login || "",
+            contactEmail: item.contactEmail || ""
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania firm:", err);
+        companies = [];
+    }
+}
+
+async function loadProjects() {
+    try {
+        const res = await apiFetch(`${API_BASE}/projects`);
+        if (!res.ok) {
+            projects = [];
+            return;
+        }
+        const data = await res.json();
+        projects = (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            topic: item.topic || "",
+            companyName: item.companyName || "",
+            teamSlots: item.maxGroups ?? 0,
+            acceptedTeams: item.currentGroupsCount ?? 0,
+            maxGroups: item.maxGroups ?? 0,
+            currentGroupsCount: item.currentGroupsCount ?? 0,
+            tags: []
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania projektów:", err);
+        projects = [];
+    }
+}
+
+async function loadTeams() {
+    try {
+        const res = await apiFetch(`${API_BASE}/groups`);
+        if (!res.ok) {
+            teams = [];
+            return;
+        }
+        const data = await res.json();
+        teams = (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            name: item.name || "",
+            projectId: item.projectId ?? null,
+            leaderId: item.leaderId ?? null,
+            memberCount: item.memberCount ?? 0,
+            status: mapAcceptanceStatus(item.isAccepted),
+            members: []
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania zespołów:", err);
+        teams = [];
+    }
+}
+
+async function loadNotifications() {
+    try {
+        const res = await apiFetch(`${API_BASE}/notifications/all`);
+        if (!res.ok) {
+            notifications = [];
+            return;
+        }
+        const data = await res.json();
+        notifications = (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            fromName: item.fromName || "System",
+            toName: item.toName || "",
+            content: item.content || "",
+            createdAt: item.createdAt
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania powiadomień:", err);
+        notifications = [];
+    }
+}
+
+async function loadTeamMembers(teamId) {
+    try {
+        const res = await apiFetch(`${API_BASE}/groups/${teamId}/summary`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        const members = data.members || data.Members || [];
+        return members.map(m => ({
+            id: m.id ?? m.Id,
+            fullName: m.userName || m.UserName || "",
+            email: m.email || m.Email || ""
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania członków zespołu:", err);
+        return [];
+    }
+}
+
+async function loadProjectDetails(projectId) {
+    try {
+        const res = await apiFetch(`${API_BASE}/projects/${projectId}/details`);
+        if (!res.ok) return null;
+        const item = await res.json();
+        return {
+            id: item.id,
+            topic: item.topic || "",
+            description: item.description || "",
+            projectGoal: item.projectGoal || "",
+            workScope: item.workScope || "",
+            neededTechnologies: item.neededTechnologies || "",
+            companyName: item.companyName || "",
+            createdAt: item.createdAt,
+            maxGroups: item.maxGroups ?? 0,
+            maxNumberGroupMembers: item.maxNumberGroupMembers ?? 0,
+            currentGroupsCount: item.currentGroupsCount ?? 0,
+            meetingTypeId: item.meetingTypeId,
+            meetingTypeName: item.meetingTypeName || MEETING_TYPE_LABELS[item.meetingTypeId] || "",
+            partnershipType: item.partnershipType || "",
+            languageDoc: item.languageDoc || "",
+            priority: normalizePriority(item.priority),
+            notes: item.notes || "",
+            tags: item.tags || []
+        };
+    } catch (err) {
+        console.error("Błąd pobierania szczegółów projektu:", err);
         return null;
     }
 }
 
-function buildHeaders(json = true) {
-    const headers = {};
-    if (json) {
-        headers["Content-Type"] = "application/json";
+async function loadProjectComments(projectId) {
+    try {
+        const res = await apiFetch(`${API_BASE}/comments/project/${projectId}`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            authorName: item.userName || "",
+            groupName: item.groupName || "",
+            text: item.content || "",
+            createdAt: item.createdAt,
+            responses: (item.responses || []).map(r => ({
+                id: r.id,
+                authorName: r.userName || "",
+                text: r.content || "",
+                createdAt: r.createdAt
+            }))
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania komentarzy:", err);
+        return [];
     }
-    if (authToken) {
-        headers["Authorization"] = `Bearer ${authToken}`;
-    }
-    return headers;
 }
 
-function isAdminUser() {
+async function loadProjectTeams(projectId) {
+    try {
+        const res = await apiFetch(`${API_BASE}/groups/project/${projectId}/summary`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (Array.isArray(data) ? data : []).map(item => ({
+            id: item.id,
+            name: item.name,
+            projectId: item.projectId,
+            memberCount: item.memberCount ?? (item.members ? item.members.length : 0),
+            members: (item.members || []).map(m => ({
+                id: m.id,
+                fullName: m.userName || "",
+                email: m.email || ""
+            }))
+        }));
+    } catch (err) {
+        console.error("Błąd pobierania zespołów projektu:", err);
+        return [];
+    }
+}
+
+function getCurrentUserName() {
     if (!currentUser) {
-        return false;
+        return "Admin";
     }
 
-    if (typeof currentUser.role === "string") {
-        return currentUser.role.toLowerCase() === "admin";
+    const fullName = [
+        currentUser.name,
+        currentUser.surname
+    ].filter(Boolean).join(" ").trim();
+
+    if (fullName) {
+        return fullName;
     }
 
-    return currentUser.role === 0 || currentUser.role === "0";
+    if (currentUser.fullName) {
+        return currentUser.fullName;
+    }
+
+    if (currentUser.username) {
+        return currentUser.username;
+    }
+
+    if (currentUser.login) {
+        return currentUser.login;
+    }
+
+    if (currentUser.email) {
+        return currentUser.email.split("@")[0];
+    }
+
+    return "Admin";
 }
 
-function ensureAdmin() {
-    if (!authToken || !currentUser || !isAdminUser()) {
-        window.location.href = "index.html";
-        return false;
+function getUserInitial(userName) {
+    const cleanName = String(userName || "Admin").trim();
+
+    if (!cleanName) {
+        return "A";
     }
 
+    return cleanName[0].toUpperCase();
+}
+
+function setUserMenuData() {
     const avatar = document.querySelector(".user-avatar");
     const name = document.querySelector(".user-name");
-    const userName = [currentUser.name, currentUser.surname].filter(Boolean).join(" ");
+    const role = document.querySelector(".user-role");
+    const dashboardName = document.getElementById("dashboardUserName");
+
+    const userName = getCurrentUserName();
 
     if (avatar) {
-        avatar.textContent = (currentUser.name || "A")[0]?.toUpperCase() || "A";
+        avatar.textContent = getUserInitial(userName);
     }
 
     if (name) {
-        name.textContent = userName || "Admin";
+        name.textContent = userName;
     }
 
-    return true;
-}
-
-async function apiGet(path) {
-    const response = await fetch(`${API_BASE}${path}`, {
-        headers: buildHeaders()
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || response.statusText);
+    if (role) {
+        role.textContent = "Admin";
     }
 
-    return response.json();
-}
-
-async function loadStudents() {
-    const data = await apiGet("/users/students");
-    students = data.map(student => ({
-        id: student.studentId,
-        userId: student.userId,
-        fullName: `${student.name || ""} ${student.surname || ""}`.trim(),
-        details: `ID użytkownika: ${student.userId}`
-    }));
-}
-
-async function loadCompanies() {
-    const data = await apiGet("/companies");
-    companies = data.map(company => ({
-        id: company.id,
-        name: company.companyName,
-        contactEmail: company.contactEmail || "Brak kontaktu"
-    }));
-}
-
-async function loadProjects() {
-    const data = await apiGet("/projects");
-    projects = data.map(project => ({
-        id: project.id,
-        topic: project.topic,
-        companyName: project.companyName,
-        currentGroupsCount: project.currentGroupsCount,
-        maxGroups: project.maxGroups
-    }));
-}
-
-async function loadTeams() {
-    const data = await apiGet("/groups");
-    teams = data.map(team => ({
-        id: team.id,
-        name: team.name,
-        projectId: team.projectId,
-        status: team.isAccepted === true ? "accepted" : team.isAccepted === false ? "rejected" : "pending",
-        members: [],
-        memberCount: team.memberCount || 0
-    }));
-}
-
-async function loadNotifications() {
-    const data = await apiGet("/notifications/all");
-    notifications = data.map(notification => ({
-        id: notification.id,
-        title: notification.userName || `Użytkownik ${notification.userId}`,
-        text: notification.content || "",
-        date: notification.createdAt ? new Date(notification.createdAt).toLocaleString("pl-PL") : ""
-    }));
-}
-
-async function loadInitialData() {
-    if (!ensureAdmin()) {
-        return;
-    }
-
-    try {
-        await Promise.all([
-            loadStudents(),
-            loadCompanies(),
-            loadProjects(),
-            loadTeams(),
-            loadNotifications()
-        ]);
-
-        renderStudents();
-        renderTeams();
-        renderCompanies();
-        renderProjects();
-        renderNotifications();
-    } catch (error) {
-        console.error("Błąd ładowania danych:", error);
-        const dashboard = document.getElementById("dashboard");
-        if (dashboard) {
-            dashboard.innerHTML = `
-                <div class="admin-start-box">
-                    <p class="small-label">Błąd</p>
-                    <h1>Nie udało się załadować danych</h1>
-                    <p class="muted">${escapeHtml(error.message)}</p>
-                </div>
-            `;
-        }
+    if (dashboardName) {
+        dashboardName.textContent = `, ${userName}`;
     }
 }
 
@@ -523,7 +810,11 @@ function showView(viewId, saveHistory = true) {
         view.classList.remove("active-view");
     });
 
-    document.getElementById(viewId).classList.add("active-view");
+    const nextView = document.getElementById(viewId);
+
+    if (nextView) {
+        nextView.classList.add("active-view");
+    }
 }
 
 function goBack() {
@@ -541,6 +832,10 @@ function toggleUserMenu(event) {
 
     const menu = document.querySelector(".user-menu");
     const toggle = document.querySelector(".user-menu-toggle");
+
+    if (!menu || !toggle) {
+        return;
+    }
 
     menu.classList.toggle("open");
 
@@ -572,27 +867,48 @@ function logout() {
     window.location.href = "index.html";
 }
 
-function showStudents() {
+function showAdminDashboard() {
+    showView("adminDashboard");
+}
+
+async function showActiveProjects() {
+    await loadProjects();
+    renderActiveProjects();
+    showView("activeProjects");
+}
+
+async function showStatistics() {
+    await loadProjects();
+    renderStatistics();
+    showView("statistics");
+}
+
+async function showStudents() {
+    await loadStudents();
     renderStudents();
     showView("students");
 }
 
-function showTeams() {
+async function showTeams() {
+    await Promise.all([loadTeams(), loadProjects()]);
     renderTeams();
     showView("teams");
 }
 
-function showCompanies() {
+async function showCompanies() {
+    await loadCompanies();
     renderCompanies();
     showView("companies");
 }
 
-function showProjects() {
+async function showProjects() {
+    await loadProjects();
     renderProjects();
     showView("projects");
 }
 
-function showNotifications() {
+async function showNotifications() {
+    await loadNotifications();
     renderNotifications();
     showView("notifications");
 }
@@ -613,7 +929,7 @@ function renderStudents() {
         item.innerHTML = `
             <div class="list-main">
                 <strong>${index + 1}. ${escapeHtml(student.fullName)}</strong>
-                <span>${escapeHtml(student.details)}</span>
+                <span>${escapeHtml(student.email)}</span>
             </div>
 
             <button class="danger-small" onclick="openDelete('student', ${student.id}, 'students')">Usuń studenta</button>
@@ -639,7 +955,7 @@ function renderCompanies() {
         item.innerHTML = `
             <div class="list-main">
                 <strong>${index + 1}. ${escapeHtml(company.name)}</strong>
-                <span>${escapeHtml(company.contactEmail)}</span>
+                <span>Login: ${escapeHtml(company.login)}</span>
             </div>
 
             <button class="danger-small" onclick="openDelete('company', ${company.id}, 'companies')">Usuń firmę</button>
@@ -666,9 +982,9 @@ function renderProjects() {
             <button class="project-card" onclick="showProjectDetails(${project.id})">
                 <div>
                     <strong>${index + 1}. ${escapeHtml(project.topic)}</strong>
-                    <span>${escapeHtml(project.companyName)}</span>
+                    <span>${escapeHtml(project.companyName)} · ${formatArray(project.tags)}</span>
                 </div>
-                <p>${project.currentGroupsCount || 0}/${project.maxGroups || 0}</p>
+                <p>${project.acceptedTeams || 0}/${project.teamSlots || 0}</p>
             </button>
 
             <button class="danger-small" onclick="openDelete('project', ${project.id}, 'projects')">Usuń projekt</button>
@@ -720,13 +1036,160 @@ function renderNotifications() {
     notifications.forEach(notification => {
         const item = document.createElement("div");
         item.className = "notification-item";
+
+        const fromName = notification.fromName || "System";
+        const toName = notification.toName || "—";
+        const createdAt = notification.createdAt
+            ? new Date(notification.createdAt).toLocaleString()
+            : "";
+
         item.innerHTML = `
-            <strong>${escapeHtml(notification.title)}</strong>
-            <p>${escapeHtml(notification.text)}</p>
-            <span class="notification-date">${escapeHtml(notification.date)}</span>
+            <div class="notification-meta">
+                <strong>Od:</strong> ${escapeHtml(fromName)}
+                &nbsp;·&nbsp;
+                <strong>Do:</strong> ${escapeHtml(toName)}
+                ${createdAt ? `&nbsp;·&nbsp;<span class="muted">${escapeHtml(createdAt)}</span>` : ""}
+            </div>
+            <div class="notification-content">${escapeHtml(notification.content || "")}</div>
         `;
 
         list.appendChild(item);
+    });
+}
+
+function renderActiveProjects() {
+    const list = document.getElementById("activeProjectsList");
+    list.innerHTML = "";
+
+    if (projects.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak aktywnych projektów do wyświetlenia.</p></div>";
+        return;
+    }
+
+    projects.forEach(project => {
+        const button = document.createElement("button");
+        button.className = "active-project-row";
+        button.onclick = () => showProjectDetails(project.id);
+
+        button.innerHTML = `
+            <span class="active-project-icon"></span>
+            <strong>
+                ${escapeHtml(project.topic || "Projekt")}
+                [${escapeHtml(project.companyName || "Brak firmy")}]
+                ${project.currentGroupsCount || 0}/${project.maxGroups || 0}
+            </strong>
+            <span class="active-project-arrow">›</span>
+        `;
+
+        list.appendChild(button);
+    });
+}
+
+function renderStatistics() {
+    renderFilledProjects();
+    renderCompaniesByProjects();
+    renderCompaniesByTeams();
+}
+
+function renderFilledProjects() {
+    const counter = document.getElementById("filledProjectsCounter");
+    const list = document.getElementById("filledProjectsList");
+
+    list.innerHTML = "";
+
+    const filledProjects = projects.filter(project => {
+        return Number(project.maxGroups || 0) > 0 && Number(project.currentGroupsCount || 0) >= Number(project.maxGroups || 0);
+    });
+
+    counter.textContent = filledProjects.length;
+
+    if (filledProjects.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak zapełnionych projektów.</p>";
+        return;
+    }
+
+    filledProjects.forEach(project => {
+        const item = document.createElement("div");
+        item.className = "filled-project-item";
+
+        item.innerHTML = `
+            <span class="check-icon">✓</span>
+            <strong>
+                ${escapeHtml(project.topic || "Projekt")}
+                [${escapeHtml(project.companyName || "Brak firmy")}]
+                ${project.currentGroupsCount || 0}/${project.maxGroups || 0}
+            </strong>
+        `;
+
+        list.appendChild(item);
+    });
+}
+
+function renderCompaniesByProjects() {
+    const ranking = getCompaniesRankingByProjects();
+    renderPodiumChart("companiesByProjectsChart", ranking);
+}
+
+function renderCompaniesByTeams() {
+    const ranking = getCompaniesRankingByTeams();
+    renderPodiumChart("companiesByTeamsChart", ranking);
+}
+
+function getCompaniesRankingByProjects() {
+    const map = new Map();
+
+    projects.forEach(project => {
+        const companyName = project.companyName || "Brak firmy";
+        const currentValue = map.get(companyName) || 0;
+        map.set(companyName, currentValue + 1);
+    });
+
+    return Array.from(map.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3);
+}
+
+function getCompaniesRankingByTeams() {
+    const map = new Map();
+
+    projects.forEach(project => {
+        const companyName = project.companyName || "Brak firmy";
+        const currentValue = map.get(companyName) || 0;
+        map.set(companyName, currentValue + Number(project.currentGroupsCount || 0));
+    });
+
+    return Array.from(map.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3);
+}
+
+function renderPodiumChart(containerId, ranking) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+
+    if (ranking.length === 0) {
+        container.innerHTML = "<p class='empty-state'>Brak danych do wyświetlenia.</p>";
+        return;
+    }
+
+    const order = [ranking[1], ranking[0], ranking[2]].filter(Boolean);
+
+    order.forEach(item => {
+        const originalIndex = ranking.findIndex(rank => rank.name === item.name);
+        const place = originalIndex + 1;
+
+        const bar = document.createElement("div");
+        bar.className = `podium-item podium-place-${place}`;
+
+        bar.innerHTML = `
+            <span class="podium-place">${place}</span>
+            <div class="podium-bar"></div>
+            <strong>${escapeHtml(item.name)}</strong>
+        `;
+
+        container.appendChild(bar);
     });
 }
 
@@ -761,56 +1224,49 @@ async function addCompany(event) {
         return;
     }
 
-    const companyExists = companies.some(company => {
-        return company.name.toLowerCase() === name.toLowerCase();
-    });
-
-    if (companyExists) {
-        message.textContent = "Nie dodano firmy. Firma o tej samej nazwie już istnieje.";
-        message.className = "form-message error";
-        return;
-    }
-
     try {
-        const response = await fetch(`${API_BASE}/companies/admin/create-company-account`, {
+        const res = await apiFetch(`${API_BASE}/companies/admin`, {
             method: "POST",
-            headers: buildHeaders(),
             body: JSON.stringify({
-                name: name,
-                surname: "Firma",
-                login: login,
-                password: password,
-                passwordConfirm: repeatPassword,
                 companyName: name,
-                contactEmail: null
+                login: login,
+                password: password
             })
         });
 
-        const result = await response.json();
+        if (!res.ok) {
+            let errorMessage = "Nie dodano firmy.";
+            try {
+                const errorBody = await res.json();
+                errorMessage = errorBody.message
+                    || (typeof errorBody === "string" ? errorBody : errorMessage);
+            } catch (_) {
+                try {
+                    const errorText = await res.text();
+                    if (errorText) errorMessage = errorText;
+                } catch (_) {}
+            }
 
-        if (!response.ok) {
-            throw new Error(result.message || JSON.stringify(result) || "Błąd dodawania firmy.");
+            if (res.status === 409) {
+                errorMessage = "Nie dodano firmy. Podany login jest już zajęty.";
+            }
+
+            message.textContent = errorMessage;
+            message.className = "form-message error";
+            return;
         }
 
-        await loadCompanies();
-
-        notifications.unshift({
-            id: Date.now(),
-            title: "Nowe konto firmy",
-            text: `Administrator dodał nową firmę ${name}.`
-        });
-
+        await Promise.all([loadCompanies(), loadNotifications()]);
         renderCompanies();
         renderNotifications();
 
         event.target.reset();
-        message.textContent = "Firma została dodana.";
-        message.className = "form-message success";
 
         removeDeleteConfirmFromHistory();
         showView("companies", false);
-    } catch (error) {
-        message.textContent = error.message || "Błąd dodawania firmy.";
+    } catch (err) {
+        console.error("Błąd dodawania firmy:", err);
+        message.textContent = "Nie dodano firmy. Spróbuj ponownie.";
         message.className = "form-message error";
     }
 }
@@ -867,51 +1323,61 @@ function cancelDelete() {
     goBack();
 }
 
-function confirmDelete() {
-    if (deleteData.type === "student") {
-        students = students.filter(student => student.id !== deleteData.id);
+async function confirmDelete() {
+    const { type, id, returnView } = deleteData;
+    let success = false;
 
-        teams.forEach(team => {
-            team.members = team.members.filter(member => member.id !== deleteData.id);
-        });
-
-        renderStudents();
-        renderTeams();
-    }
-
-    if (deleteData.type === "team") {
-        const team = teams.find(item => item.id === deleteData.id);
-
-        if (team && team.status === "accepted") {
-            const project = projects.find(item => item.id === team.projectId);
-
-            if (project && project.currentGroupsCount > 0) {
-                project.currentGroupsCount -= 1;
+    try {
+        if (type === "student") {
+            const res = await apiFetch(`${API_BASE}/students/${id}`, { method: "DELETE" });
+            success = res.ok;
+            if (success) {
+                await Promise.all([loadStudents(), loadTeams()]);
+                renderStudents();
+                renderTeams();
             }
         }
 
-        teams = teams.filter(team => team.id !== deleteData.id);
+        if (type === "team") {
+            const res = await apiFetch(`${API_BASE}/groups/${id}`, { method: "DELETE" });
+            success = res.ok;
+            if (success) {
+                await Promise.all([loadTeams(), loadProjects()]);
+                renderTeams();
+                renderProjects();
+            }
+        }
 
-        renderTeams();
-        renderProjects();
+        if (type === "project") {
+            const res = await apiFetch(`${API_BASE}/projects/${id}`, { method: "DELETE" });
+            success = res.ok;
+            if (success) {
+                await Promise.all([loadProjects(), loadTeams()]);
+                renderProjects();
+                renderTeams();
+            }
+        }
+
+        if (type === "company") {
+            const res = await apiFetch(`${API_BASE}/companies/${id}`, { method: "DELETE" });
+            success = res.ok;
+            if (success) {
+                await Promise.all([loadCompanies(), loadProjects(), loadTeams()]);
+                renderCompanies();
+                renderProjects();
+                renderTeams();
+            }
+        }
+
+        if (!success) {
+            alert("Nie udało się usunąć rekordu. Sprawdź uprawnienia i spróbuj ponownie.");
+        }
+    } catch (err) {
+        console.error("Błąd usuwania rekordu:", err);
+        alert("Nie udało się usunąć rekordu. Spróbuj ponownie.");
     }
 
-    if (deleteData.type === "project") {
-        projects = projects.filter(project => project.id !== deleteData.id);
-        teams = teams.filter(team => team.projectId !== deleteData.id);
-        comments = comments.filter(comment => comment.projectId !== deleteData.id);
-
-        renderProjects();
-        renderTeams();
-    }
-
-    if (deleteData.type === "company") {
-        companies = companies.filter(company => company.id !== deleteData.id);
-
-        renderCompanies();
-    }
-
-    const returnView = deleteData.returnView || "dashboard";
+    const safeReturnView = returnView || "dashboard";
 
     deleteData = {
         type: null,
@@ -921,11 +1387,11 @@ function confirmDelete() {
 
     removeDeleteConfirmFromHistory();
 
-    if (viewHistory[viewHistory.length - 1] === returnView) {
+    if (viewHistory[viewHistory.length - 1] === safeReturnView) {
         viewHistory.pop();
     }
 
-    showView(returnView, false);
+    showView(safeReturnView, false);
 }
 
 function removeDeleteConfirmFromHistory() {
@@ -938,107 +1404,99 @@ function removeDeleteConfirmFromHistory() {
 
 async function showProjectDetails(projectId) {
     currentProjectId = projectId;
-    const summary = projects.find(item => item.id === projectId);
 
-    if (!summary) {
+    const project = await loadProjectDetails(projectId);
+
+    if (!project) {
+        alert("Nie udało się pobrać szczegółów projektu.");
         return;
     }
 
-    try {
-        currentProjectDetails = await apiGet(`/projects/${projectId}/details`);
-    } catch (error) {
-        console.error("Błąd pobierania szczegółów projektu:", error);
-        currentProjectDetails = null;
+    const cachedProject = projects.find(item => item.id === projectId);
+    if (cachedProject) {
+        cachedProject.topic = project.topic;
+        cachedProject.companyName = project.companyName;
+        cachedProject.teamSlots = project.maxGroups;
+        cachedProject.acceptedTeams = project.currentGroupsCount;
+        cachedProject.tags = project.tags;
+        cachedProject.description = project.description;
+        cachedProject.projectGoal = project.projectGoal;
+        cachedProject.workScope = project.workScope;
+        cachedProject.neededTechnologies = project.neededTechnologies;
+        cachedProject.priority = project.priority;
     }
 
-    document.getElementById("projectDetailsTitle").textContent = summary.topic || "";
+    document.getElementById("projectDetailsTitle").textContent = project.topic || "";
     document.getElementById("projectDetailsInfo").textContent =
-        `${summary.companyName || ""} · ${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
+        `${project.companyName} · ${project.currentGroupsCount}/${project.maxGroups}`;
 
-    document.getElementById("projectDetailsDescription").textContent = currentProjectDetails?.neededTechnologies || "";
-    document.getElementById("projectDetailsGoal").textContent = currentProjectDetails?.projectGoal || "";
-    document.getElementById("projectDetailsWorkScope").textContent = currentProjectDetails?.workScope || "";
-    document.getElementById("projectDetailsTechResources").textContent = currentProjectDetails?.neededTechnologies || "";
-    document.getElementById("projectDetailsCompany").textContent = currentProjectDetails?.companyName || summary.companyName || "";
+    document.getElementById("projectDetailsDescription").textContent = project.description || "";
+    document.getElementById("projectDetailsGoal").textContent = project.projectGoal || "";
+    document.getElementById("projectDetailsWorkScope").textContent = project.workScope || "";
+    document.getElementById("projectDetailsTechResources").textContent = project.neededTechnologies || "";
+    document.getElementById("projectDetailsCompany").textContent = project.companyName || "";
     document.getElementById("projectDetailsTeams").textContent =
-        `${summary.currentGroupsCount || 0}/${summary.maxGroups || 0}`;
-    document.getElementById("projectDetailsPriority").textContent =
-        priorityLabels[currentProjectDetails?.priority] || (currentProjectDetails?.priority ? String(currentProjectDetails.priority) : "");
+        `${project.currentGroupsCount}/${project.maxGroups}`;
+    document.getElementById("projectDetailsPriority").textContent = priorityLabels[project.priority] || "";
 
     showView("projectDetails");
 }
 
 async function showProjectComments() {
+    if (!currentProjectId) return;
+
     const list = document.getElementById("projectCommentsList");
+    list.innerHTML = "<p class='empty-state'>Ładowanie komentarzy...</p>";
+    showView("projectComments");
+
+    const projectComments = await loadProjectComments(currentProjectId);
+    comments = projectComments;
     list.innerHTML = "";
 
-    if (!currentProjectId) {
-        list.innerHTML = "<p class='empty-state'>Wybierz projekt, aby zobaczyć komentarze.</p>";
-        showView("projectComments");
+    if (projectComments.length === 0) {
+        list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
         return;
     }
 
-    try {
-        comments = await apiGet(`/comments/project/${currentProjectId}`);
-    } catch (error) {
-        console.error("Błąd pobierania komentarzy:", error);
-        comments = [];
-    }
+    projectComments.forEach(comment => {
+        const item = document.createElement("div");
+        item.className = "comment-item";
 
-    if (comments.length === 0) {
-        list.innerHTML = "<p class='empty-state'>Brak komentarzy dla tego projektu.</p>";
-    } else {
-        comments.forEach(comment => {
-            const item = document.createElement("div");
-            item.className = "comment-item";
+        const responsesMarkup = (comment.responses || []).map(response => `
+            <div class="comment-response">
+                <strong>${escapeHtml(response.authorName || "")}</strong>
+                <p>${escapeHtml(response.text || "")}</p>
+            </div>
+        `).join("");
 
-            item.innerHTML = `
-                <strong>${escapeHtml(comment.userName || `Użytkownik ${comment.userId}`)}</strong>
-                <p>${escapeHtml(comment.content || comment.comment || "")}</p>
-            `;
+        item.innerHTML = `
+            <strong>${escapeHtml(comment.authorName || "")}${comment.groupName ? ` (${escapeHtml(comment.groupName)})` : ""}</strong>
+            <p>${escapeHtml(comment.text || "")}</p>
+            ${responsesMarkup}
+        `;
 
-            if (comment.responses && comment.responses.length > 0) {
-                const responsesHtml = comment.responses.map(response => `
-                    <div class="comment-response">
-                        <strong>${escapeHtml(response.userName || `Użytkownik ${response.userId}`)}</strong>
-                        <p>${escapeHtml(response.content || "")}</p>
-                    </div>
-                `).join("");
-
-                item.innerHTML += `<div class="comment-responses">${responsesHtml}</div>`;
-            }
-
-            list.appendChild(item);
-        });
-    }
-
-    showView("projectComments");
+        list.appendChild(item);
+    });
 }
 
-function showProjectGuidelines() {
-    const summary = projects.find(item => item.id === currentProjectId);
+async function showProjectGuidelines() {
+    if (!currentProjectId) return;
 
-    if (!summary && !currentProjectDetails) {
+    const project = await loadProjectDetails(currentProjectId);
+
+    if (!project) {
+        alert("Nie udało się pobrać wytycznych projektu.");
         return;
     }
 
-    const details = currentProjectDetails || {
-        topic: summary?.topic,
-        companyName: summary?.companyName,
-        projectGoal: "",
-        workScope: "",
-        neededTechnologies: "",
-        tags: []
-    };
+    document.getElementById("guidelinesTopic").textContent = project.topic || "";
+    document.getElementById("guidelinesCompany").textContent = project.companyName || "";
+    document.getElementById("guidelinesDescription").textContent = project.description || "";
+    document.getElementById("guidelinesGoal").textContent = project.projectGoal || "";
+    document.getElementById("guidelinesWorkScope").textContent = project.workScope || "";
+    document.getElementById("guidelinesTechResources").textContent = project.neededTechnologies || "";
 
-    document.getElementById("guidelinesTopic").textContent = details.topic || "";
-    document.getElementById("guidelinesCompany").textContent = details.companyName || "";
-    document.getElementById("guidelinesDescription").textContent = details.neededTechnologies || "";
-    document.getElementById("guidelinesGoal").textContent = details.projectGoal || "";
-    document.getElementById("guidelinesWorkScope").textContent = details.workScope || "";
-    document.getElementById("guidelinesTechResources").textContent = details.neededTechnologies || "";
-
-    renderGuidelineTags(details.tags || []);
+    renderGuidelineTags(project.tags || []);
 
     showView("projectGuidelines");
 }
@@ -1059,110 +1517,310 @@ function renderGuidelineTags(tags) {
     });
 }
 
-function showProjectTeams() {
+async function showProjectTeams() {
+    if (!currentProjectId) return;
+
     const list = document.getElementById("projectTeamsList");
-    const acceptedTeams = teams.filter(team => {
-        return team.projectId === currentProjectId && team.status === "accepted";
+    list.innerHTML = "<div class='card'><p class='empty-state'>Ładowanie zespołów...</p></div>";
+    showView("projectTeams");
+
+    const projectTeams = await loadProjectTeams(currentProjectId);
+
+    projectTeams.forEach(remote => {
+        const cached = teams.find(t => t.id === remote.id);
+        if (cached) {
+            cached.members = remote.members;
+            cached.memberCount = remote.memberCount;
+            cached.name = remote.name;
+        } else {
+            teams.push({
+                id: remote.id,
+                name: remote.name,
+                projectId: remote.projectId,
+                status: "accepted",
+                members: remote.members,
+                memberCount: remote.memberCount
+            });
+        }
     });
 
     list.innerHTML = "";
 
-    if (acceptedTeams.length === 0) {
-        list.innerHTML = "<div class='card'><p class='empty-state'>Brak zaakceptowanych zespołów dla tego projektu.</p></div>";
-    } else {
-        acceptedTeams.forEach((team, index) => {
-            const card = document.createElement("div");
-            card.className = "team-card";
-
-            card.innerHTML = `
-                <div class="team-main" onclick="showTeamDetails(${team.id})">
-                    <strong>${index + 1}. ${escapeHtml(team.name)}</strong>
-                    <span>Zaakceptowany</span>
-                </div>
-            `;
-
-            list.appendChild(card);
-        });
+    if (projectTeams.length === 0) {
+        list.innerHTML = "<div class='card'><p class='empty-state'>Brak zespołów dla tego projektu.</p></div>";
+        return;
     }
 
-    showView("projectTeams");
+    projectTeams.forEach((team, index) => {
+        const card = document.createElement("div");
+        card.className = "team-card";
+
+        card.innerHTML = `
+            <div class="team-main" onclick="showTeamDetails(${team.id})">
+                <strong>${index + 1}. ${escapeHtml(team.name)}</strong>
+                <span>Członków: ${team.memberCount}</span>
+            </div>
+        `;
+
+        list.appendChild(card);
+    });
 }
 
 async function showTeamDetails(teamId) {
     currentTeamId = teamId;
 
-    const team = teams.find(item => item.id === teamId);
+    let team = teams.find(item => item.id === teamId);
 
     if (!team) {
-        return;
+        team = { id: teamId, name: "", projectId: null, members: [], status: "pending" };
+        teams.push(team);
     }
+
+    const members = await loadTeamMembers(teamId);
+    team.members = members;
+    team.memberCount = members.length;
 
     const project = projects.find(item => item.id === team.projectId);
 
     document.getElementById("teamDetailsName").textContent = team.name || "";
-    document.getElementById("teamDetailsProject").textContent =
-        `Przypisany projekt: ${project?.topic || "Brak projektu"}`;
+    document.getElementById("teamDetailsProject").textContent = `Przypisany projekt: ${project?.topic || "Brak projektu"}`;
 
     const membersList = document.getElementById("teamDetailsMembers");
     membersList.innerHTML = "";
-
-    let members = team.members || [];
-    if (members.length === 0) {
-        try {
-            const response = await apiGet(`/groups/${teamId}`);
-            members = response.members || [];
-            team.members = members;
-        } catch (error) {
-            console.error("Błąd pobierania członków zespołu:", error);
-        }
-    }
 
     if (!members || members.length === 0) {
         membersList.innerHTML = "<p class='empty-state'>Brak członków zespołu do wyświetlenia.</p>";
     } else {
         members.forEach(member => {
             const li = document.createElement("li");
-            li.textContent = member.email || `Student #${member.id}`;
+            li.textContent = member.fullName + (member.email ? ` (${member.email})` : "");
             membersList.appendChild(li);
         });
     }
 
     const repositoryButton = document.getElementById("repositoryButton");
-
-    if (team.status === "accepted") {
+    if (repositoryButton) {
         repositoryButton.classList.remove("hidden");
-    } else {
-        repositoryButton.classList.add("hidden");
     }
 
     showView("teamDetails");
 }
 
-function showRepository() {
+async function showRepository() {
     const team = teams.find(item => item.id === currentTeamId);
     const project = projects.find(item => item.id === team?.projectId);
 
     document.getElementById("repositoryDescription").textContent =
         `${team?.name || "Zespół"} · ${project?.topic || "Projekt"}`;
 
-    renderRepositoryFiles();
     showView("repository");
+    await loadAdminRepositoryFiles();
+}
+
+async function loadAdminRepositoryFiles() {
+    const list = document.getElementById("repositoryFiles");
+    list.innerHTML = "<li class='empty-state'>Ładowanie plików...</li>";
+
+    if (!currentTeamId) {
+        list.innerHTML = "<li class='empty-state'>Nie wybrano zespołu.</li>";
+        repositoryFiles = [];
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/files?teamId=${currentTeamId}`, {
+            headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+            throw new Error(await readAdminApiError(res, "Nie udało się pobrać plików"));
+        }
+
+        const data = await res.json();
+        repositoryFiles = Array.isArray(data) ? data : [];
+        renderRepositoryFiles();
+    } catch (err) {
+        console.error("Błąd pobierania plików:", err);
+        list.innerHTML = `<li class='empty-state'>${escapeHtml(err.message)}</li>`;
+        repositoryFiles = [];
+    }
 }
 
 function renderRepositoryFiles() {
     const list = document.getElementById("repositoryFiles");
     list.innerHTML = "";
 
-    if (repositoryFiles.length === 0) {
+    if (!repositoryFiles || repositoryFiles.length === 0) {
         list.innerHTML = "<li class='empty-state'>Brak plików do wyświetlenia.</li>";
         return;
     }
 
     repositoryFiles.forEach(file => {
         const li = document.createElement("li");
-        li.textContent = file.name || "";
+        li.className = "file-item";
+
+        const fileName = file.fileName || file.FileName || "(bez nazwy)";
+        const uploadDate = file.uploadDate || file.UploadDate || "";
+        const dateLabel = uploadDate ? new Date(uploadDate).toLocaleString("pl-PL") : "";
+
+        const info = document.createElement("div");
+        info.className = "file-info";
+        info.innerHTML = `
+            <span class="file-name">${escapeHtml(fileName)}</span>
+            ${dateLabel ? `<span class="file-meta">${escapeHtml(dateLabel)}</span>` : ""}
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "file-actions";
+
+        const downloadBtn = document.createElement("button");
+        downloadBtn.type = "button";
+        downloadBtn.className = "file-action-btn";
+        downloadBtn.textContent = "Pobierz";
+        downloadBtn.onclick = () => downloadAdminFile(file.id || file.Id, fileName);
+        actions.appendChild(downloadBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "file-action-btn danger";
+        deleteBtn.textContent = "Usuń";
+        deleteBtn.onclick = () => deleteAdminFile(file.id || file.Id, fileName);
+        actions.appendChild(deleteBtn);
+
+        li.appendChild(info);
+        li.appendChild(actions);
         list.appendChild(li);
     });
+}
+
+async function handleAdminFileUpload(event) {
+    const input = event.target;
+    const files = Array.from(input.files || []);
+    const message = document.getElementById("repositoryUploadMessage");
+
+    if (files.length === 0) return;
+
+    if (!currentTeamId) {
+        message.textContent = "Najpierw wybierz zespół.";
+        message.className = "form-message error";
+        input.value = "";
+        return;
+    }
+
+    message.textContent = `Wysyłanie ${files.length} plik(ów)...`;
+    message.className = "form-message";
+
+    let okCount = 0;
+    const failed = [];
+
+    for (const file of files) {
+        try {
+            await uploadAdminFile(file, currentTeamId);
+            okCount++;
+        } catch (err) {
+            console.error("Błąd przesyłania pliku:", err);
+            failed.push(`${file.name}: ${err.message}`);
+        }
+    }
+
+    input.value = "";
+
+    if (failed.length === 0) {
+        message.textContent = `Wysłano ${okCount} plik(ów).`;
+        message.className = "form-message success";
+    } else {
+        message.textContent = `Wysłano ${okCount}/${files.length} plik(ów). Błędy: ${failed.join("; ")}`;
+        message.className = "form-message error";
+    }
+
+    await loadAdminRepositoryFiles();
+}
+
+async function uploadAdminFile(file, teamId) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE}/files/upload?teamId=${teamId}`, {
+        method: "POST",
+        headers: {
+            "Authorization": token ? `Bearer ${token}` : ""
+        },
+        body: formData
+    });
+
+    if (!res.ok) {
+        throw new Error(await readAdminApiError(res, "Błąd wysyłania pliku"));
+    }
+
+    return await res.json();
+}
+
+async function downloadAdminFile(fileId, fileName) {
+    if (!fileId) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/files/download/${fileId}`, {
+            headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+            throw new Error(await readAdminApiError(res, "Błąd pobierania pliku"));
+        }
+
+        const data = await res.json();
+        if (!data?.url) {
+            throw new Error("Brak adresu URL do pobrania pliku.");
+        }
+
+        const link = document.createElement("a");
+        link.href = data.url;
+        link.download = fileName || "";
+        link.rel = "noopener";
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        console.error("Błąd pobierania pliku:", err);
+        alert(`Nie udało się pobrać pliku: ${err.message}`);
+    }
+}
+
+async function deleteAdminFile(fileId, fileName) {
+    if (!fileId) return;
+    if (!confirm(`Usunąć plik „${fileName || ""}”?`)) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/files/${fileId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders()
+        });
+
+        if (!res.ok && res.status !== 204) {
+            throw new Error(await readAdminApiError(res, "Błąd usuwania pliku"));
+        }
+
+        await loadAdminRepositoryFiles();
+    } catch (err) {
+        console.error("Błąd usuwania pliku:", err);
+        alert(`Nie udało się usunąć pliku: ${err.message}`);
+    }
+}
+
+async function readAdminApiError(res, fallback) {
+    try {
+        const text = await res.text();
+        if (!text) return fallback;
+        try {
+            const parsed = JSON.parse(text);
+            return parsed.error || parsed.message || parsed.title || parsed.detail || text;
+        } catch (_) {
+            return text;
+        }
+    } catch (_) {
+        return fallback;
+    }
 }
 
 function getTeamStatusText(status) {

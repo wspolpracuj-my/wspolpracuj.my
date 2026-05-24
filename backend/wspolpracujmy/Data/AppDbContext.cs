@@ -4,8 +4,14 @@ using wspolpracujmy.Models;
 
 namespace wspolpracujmy.Data
 {
+    /// <summary>
+    /// Główny kontekst Entity Framework dla aplikacji.
+    /// </summary>
     public class AppDbContext : DbContext
     {
+        /// <summary>
+        /// Bezpiecznie parsuje status żądania grupowego z wartości tekstowej.
+        /// </summary>
         private static GroupStatus ParseGroupStatus(string v)
         {
             if (string.IsNullOrEmpty(v)) return GroupStatus.Pending;
@@ -32,11 +38,15 @@ namespace wspolpracujmy.Data
         public DbSet<Response> Responses { get; set; }
         public DbSet<Tag> Tags { get; set; }
         public DbSet<ProjectTag> ProjectTags { get; set; }
+        public DbSet<ProjectFile> ProjectFiles { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<CalendarEvent> CalendarEvents { get; set; }
         public DbSet<MeetingType> Meeting_types { get; set; }
         public DbSet<GroupRequest> GroupRequests { get; set; }
 
+        /// <summary>
+        /// Konfiguruje mapowania encji, relacje i konwersje typów.
+        /// </summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Table names (ensure exact names from init.sql)
@@ -51,11 +61,19 @@ namespace wspolpracujmy.Data
             modelBuilder.Entity<Response>().ToTable("Responses");
             modelBuilder.Entity<Tag>().ToTable("Tags");
             modelBuilder.Entity<ProjectTag>().ToTable("ProjectTags");
+            modelBuilder.Entity<ProjectFile>().ToTable("ProjectFiles");
             modelBuilder.Entity<Notification>().ToTable("Notifications");
             modelBuilder.Entity<CalendarEvent>().ToTable("CalendarEvents");
             modelBuilder.Entity<MeetingType>().ToTable("Meeting_types");
             modelBuilder.Entity<GroupRequest>().ToTable("GroupRequests");
 
+            modelBuilder.Entity<ProjectFile>()
+                .HasIndex(pf => pf.TeamId);
+            modelBuilder.Entity<ProjectFile>()
+                .HasOne<Group>()
+                .WithMany()
+                .HasForeignKey(pf => pf.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
             // Store GroupRequest.Status enum as string in the database
             // When reading from the DB, tolerate unexpected string values by falling
             // back to GroupStatus.Pending instead of throwing an exception.

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ namespace wspolpracujmy.Controllers
         private readonly ProjectService _projectService;
         private readonly ProjectCommentService _projectCommentService;
         private readonly wspolpracujmy.Services.GroupAuthorizationService _groupAuth;
+        private readonly NotificationService _notifications;
 
         /// <summary>
         /// Tworzy kontroler projektów z wymaganymi zależnościami.
@@ -30,24 +32,24 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         /// <param name="projectService">Serwis do pobierania podsumowań projektów.</param>
         /// <param name="projectCommentService">Serwis obsługi komentarzy projektów.</param>
-        public ProjectsController(AppDbContext db, ProjectService projectService, ProjectCommentService projectCommentService, wspolpracujmy.Services.GroupAuthorizationService groupAuth)
+        public ProjectsController(AppDbContext db, ProjectService projectService, ProjectCommentService projectCommentService, wspolpracujmy.Services.GroupAuthorizationService groupAuth, NotificationService notifications)
         {
             _db = db;
             _projectService = projectService;
             _projectCommentService = projectCommentService;
             _groupAuth = groupAuth;
+            _notifications = notifications;
         }
 
         [HttpGet]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę podsumowań wszystkich projektów.
         /// </summary>
         /// <returns>Lista podsumowań projektów.</returns>
         public async Task<ActionResult<IEnumerable<ProjectSummaryDto>>> Get()
         {
-            // Any authenticated user (including Admin) may list projects.
-            return Ok(await _projectService.GetAllProjectSummariesAsync());
+            var summaries = await _projectService.GetAllProjectSummariesAsync();
+            return Ok(summaries);
         }
 
         // trzebazmienickoniecznie
@@ -61,7 +63,13 @@ namespace wspolpracujmy.Controllers
         public async Task<ActionResult<Project>> Post([FromBody] CreateProjectDto dto)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            {
+                var errors = ModelState
+                    .Where(e => e.Value?.Errors.Count > 0)
+                    .SelectMany(e => e.Value!.Errors.Select(err =>
+                        string.IsNullOrEmpty(err.ErrorMessage) ? e.Key : err.ErrorMessage));
+                return BadRequest(new { message = "Nieprawidłowe dane projektu.", errors = errors.ToList() });
+            }
 
             // If caller is a Company, derive CompanyId from their user account; Admin may provide CompanyId in DTO.
             var role = wspolpracujmy.Services.GroupAuthorizationService.GetRoleFromClaims(User);
@@ -206,7 +214,6 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("summary")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca podsumowania projektów dla konkretnej firmy.
         /// </summary>
@@ -222,19 +229,17 @@ namespace wspolpracujmy.Controllers
         }
 
         [HttpGet("summary/all")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca podsumowania wszystkich projektów (bez filtrowania).
         /// </summary>
         /// <returns>Lista podsumowań projektów.</returns>
         public async Task<ActionResult<List<ProjectSummaryDto>>> GetAllSummaries()
         {
-            // Any authenticated user (including Admin) may list all project summaries.
-            return Ok(await _projectService.GetAllProjectSummariesAsync());
+            var summaries = await _projectService.GetAllProjectSummariesAsync();
+            return Ok(summaries);
         }
 
         [HttpGet("{projectId:int}/groups")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę grup przypisanych do danego projektu.
         /// </summary>
@@ -296,8 +301,139 @@ namespace wspolpracujmy.Controllers
             return NoContent();
         }
 
+        [HttpGet("{projectId:int}/group-requests")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CompanyOnly")]
+        /// <summary>
+        /// Zwraca oczekujące zgłoszenia zespołów (ProjectRequest) do projektu.
+        /// </summary>
+        public async Task<ActionResult<List<ProjectGroupRequestDto>>> GetPendingGroupRequests(int projectId)
+        {
+            if (projectId <= 0)
+                return BadRequest("Parametr projectId musi być podany i większy niż 0.");
+
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return NotFound();
+
+            if (!await CanCompanyManageProjectAsync(project))
+                return Forbid();
+
+            var pending = await _db.GroupRequests
+                .Include(gr => gr.Group)
+                    .ThenInclude(g => g.Members)
+                .Where(gr => gr.ProjectId == projectId && gr.Status == GroupStatus.Pending)
+                .ToListAsync();
+
+            var requests = pending
+                .Where(gr => string.Equals(gr.Type, "ProjectRequest", StringComparison.OrdinalIgnoreCase))
+                .Select(gr => new ProjectGroupRequestDto
+                {
+                    RequestId = gr.Id,
+                    GroupId = gr.GroupId,
+                    GroupName = gr.Group.Name,
+                    MemberCount = gr.Group.Members.Count,
+                    CreatedAt = gr.CreatedAt
+                })
+                .ToList();
+
+            return Ok(requests);
+        }
+
+        [HttpPost("{projectId:int}/group-requests/{requestId:int}/respond")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CompanyOnly")]
+        /// <summary>
+        /// Akceptuje lub odrzuca zgłoszenie zespołu do projektu.
+        /// </summary>
+        public async Task<IActionResult> RespondToGroupRequest(int projectId, int requestId, [FromBody] RespondGroupRequestDto dto)
+        {
+            if (projectId <= 0 || requestId <= 0)
+                return BadRequest("Parametry projectId i requestId muszą być większe niż 0.");
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Action))
+                return BadRequest("Pole action jest wymagane (accept lub decline).");
+
+            var action = dto.Action.Trim().ToLowerInvariant();
+            if (action != "accept" && action != "decline")
+                return BadRequest("Akcja musi być 'accept' lub 'decline'.");
+
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project == null) return NotFound();
+
+            if (!await CanCompanyManageProjectAsync(project))
+                return Forbid();
+
+            var req = await _db.GroupRequests
+                .Include(r => r.Group)
+                    .ThenInclude(g => g.Members)
+                .FirstOrDefaultAsync(r => r.Id == requestId && r.ProjectId == projectId);
+
+            if (req == null) return NotFound();
+            if (req.Type == null || !req.Type.Equals("ProjectRequest", StringComparison.OrdinalIgnoreCase))
+                return BadRequest("To nie jest zgłoszenie zespołu do projektu.");
+
+            if (req.Status != GroupStatus.Pending)
+                return BadRequest("Zgłoszenie zostało już rozpatrzone.");
+
+            var group = req.Group;
+            if (group == null) return NotFound("Powiązana grupa nie została znaleziona.");
+
+            if (action == "accept")
+            {
+                if (project.MaxGroups.HasValue)
+                {
+                    var acceptedCount = await _db.Groups.CountAsync(g =>
+                        g.ProjectId == projectId && g.IsAccepted == GroupStatus.Accepted);
+                    if (acceptedCount >= project.MaxGroups.Value)
+                        return BadRequest($"Projekt osiągnął maksymalną liczbę zespołów ({project.MaxGroups.Value}).");
+                }
+
+                var memberCount = group.Members?.Count ?? await _db.Students.CountAsync(s => s.GroupId == group.Id);
+                if (memberCount > project.MaxNumberGroupMembers)
+                    return BadRequest($"Nie można zaakceptować zespołu: ma {memberCount} członków, limit projektu to {project.MaxNumberGroupMembers}.");
+
+                if (group.ProjectId.HasValue && group.ProjectId.Value != projectId)
+                    return BadRequest("Zespół jest już przypisany do innego projektu.");
+
+                group.ProjectId = projectId;
+                group.IsAccepted = GroupStatus.Accepted;
+                req.Status = GroupStatus.Accepted;
+            }
+            else
+            {
+                req.Status = GroupStatus.Declined;
+            }
+
+            req.RespondedAt = DateTime.UtcNow;
+            var responderId = GroupAuthorizationService.GetUserIdFromClaims(User);
+            if (!responderId.HasValue) return Unauthorized();
+            req.RespondedByUserId = responderId.Value;
+
+            _db.Groups.Update(group);
+            _db.GroupRequests.Update(req);
+            await _db.SaveChangesAsync();
+
+            try
+            {
+                var members = await _db.Students.Where(s => s.GroupId == group.Id).ToListAsync();
+                var companyName = project.Company?.CompanyName ?? "Firma";
+                var projectName = project.Topic;
+                var accepted = action == "accept";
+                var content = accepted
+                    ? Notification.FormatCompanyProjectAccepted(companyName, projectName)
+                    : Notification.FormatCompanyProjectDeclined(companyName, projectName);
+                var linkTarget = Notification.LinkTargetProjectDecision(projectId, accepted);
+                foreach (var member in members)
+                {
+                    await _notifications.CreateNotificationAsync(member.UserId, content, linkTarget);
+                }
+            }
+            catch
+            {
+                // Powiadomienia nie są krytyczne dla akceptacji.
+            }
+
+            return Ok(new { requestId = req.Id, groupId = group.Id, status = req.Status.ToString() });
+        }
+
         [HttpGet("{id:int}/details")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca szczegółowe informacje o projekcie.
         /// </summary>
@@ -314,13 +450,20 @@ namespace wspolpracujmy.Controllers
                     Id = p.Id,
                     CompanyName = p.Company != null ? p.Company.CompanyName : string.Empty,
                     Topic = p.Topic,
+                    Description = p.Description,
                     ProjectGoal = p.ProjectGoal,
                     WorkScope = p.WorkScope,
                     NeededTechnologies = p.NeededTechnologies,
+                    CreatedAt = p.CreatedAt,
                     MaxGroups = p.MaxGroups,
                     MaxNumberGroupMembers = p.MaxNumberGroupMembers,
+                    CurrentGroupsCount = p.Groups.Count(g => g.IsAccepted == GroupStatus.Accepted),
+                    MeetingTypeId = p.MeetingTypeId,
+                    MeetingTypeName = p.MeetingType != null ? p.MeetingType.Type : null,
+                    PartnershipType = p.PartnershipType,
                     LanguageDoc = p.LanguageDoc,
                     Priority = p.Priority,
+                    Notes = p.Notes,
                     Tags = p.ProjectTags.Select(pt => pt.Tag.Name).ToList()
                 })
                 .FirstOrDefaultAsync();
@@ -360,6 +503,22 @@ namespace wspolpracujmy.Controllers
         {
             var company = await _db.Companies.FindAsync(companyId);
             return company?.UserId == userId;
+        }
+
+        private async Task<bool> CanCompanyManageProjectAsync(Project project)
+        {
+            if (IsAdmin()) return true;
+
+            var role = GroupAuthorizationService.GetRoleFromClaims(User);
+            var isCompany = string.Equals(role, "Company", StringComparison.OrdinalIgnoreCase)
+                || role == ((int)Models.Role.Company).ToString();
+            if (!isCompany) return false;
+
+            var userIdMaybe = GroupAuthorizationService.GetUserIdFromClaims(User);
+            if (!userIdMaybe.HasValue) return false;
+
+            var companyForUser = await _db.Companies.FirstOrDefaultAsync(c => c.UserId == userIdMaybe.Value);
+            return companyForUser != null && project.CompanyId == companyForUser.Id;
         }
     }
 }

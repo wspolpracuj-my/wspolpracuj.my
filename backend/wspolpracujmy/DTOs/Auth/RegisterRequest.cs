@@ -3,6 +3,9 @@ using wspolpracujmy.Models;
 
 namespace wspolpracujmy.DTOs.Auth
 {
+    /// <summary>
+    /// Dane wejściowe używane podczas rejestracji nowego użytkownika.
+    /// </summary>
     public class RegisterRequest
     {
         [Required]

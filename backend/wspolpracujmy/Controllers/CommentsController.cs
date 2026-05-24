@@ -1,7 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +37,6 @@ namespace wspolpracujmy.Controllers
         // public async Task<IEnumerable<Comment>> Get() => await _db.Comments.ToListAsync();
 
         [HttpGet("project/{projectId:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca listę komentarzy wraz z odpowiedziami dla zadanego projektu.
         /// </summary>
@@ -50,79 +49,14 @@ namespace wspolpracujmy.Controllers
             var exists = await _db.Projects.AnyAsync(p => p.Id == projectId);
             if (!exists) return NotFound();
 
-            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(projectId, currentUserId)) return Forbid();
 
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
-
-            // Admin has access to all comments
-            if (role == "Admin")
-            {
-                var comments = await _projectCommentService.GetCommentsForProjectAsync(projectId);
-                return Ok(comments);
-            }
-
-            // Company: only the company owning the project may see all comments
-            if (role == "Company")
-            {
-                var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
-                if (project == null) return NotFound();
-                if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
-
-                var comments = await _projectCommentService.GetCommentsForProjectAsync(projectId);
-                return Ok(comments);
-            }
-
-            // Students: can see comments written by the company OR comments written by their own group.
-            // For those comments, include responses written by the company and responses written by members of their group.
-            if (role == "Student")
-            {
-                var currentStudent = await _db.Students.FirstOrDefaultAsync(s => s.UserId == currentUserId);
-                if (currentStudent == null) return Forbid();
-                var groupId = currentStudent.GroupId;
-
-                var comments = await _db.Comments
-                    .Where(c => c.ProjectId == projectId && (
-                        c.User.Role == Models.Role.Company
-                        || (groupId.HasValue && _db.Students.Any(s => s.UserId == c.UserId && s.GroupId == groupId))
-                    ))
-                    .Include(c => c.User)
-                    .Include(c => c.Responses).ThenInclude(r => r.User).ThenInclude(u => u.Student)
-                    .Select(c => new CommentWithResponsesDto
-                    {
-                        Id = c.Id,
-                        UserId = c.UserId,
-                        UserName = c.User != null ? c.User.Name + " " + c.User.Surname : null,
-                        GroupId = _db.Students.Where(s => s.UserId == c.UserId).Select(s => (int?)s.GroupId).FirstOrDefault(),
-                        Content = c.Content,
-                        CreatedAt = c.CreatedAt,
-                        Responses = c.Responses
-                            .Where(r => r.User != null && (
-                                (r.User.Student != null && r.User.Student.GroupId.HasValue && groupId.HasValue && r.User.Student.GroupId == groupId)
-                                || r.User.Role == Models.Role.Company
-                            ))
-                            .Select(r => new ResponseDto
-                            {
-                                Id = r.Id,
-                                UserId = r.UserId,
-                                UserName = r.User != null ? r.User.Name + " " + r.User.Surname : null,
-                                Content = r.Content,
-                                CreatedAt = r.CreatedAt
-                            }).ToList()
-                    })
-                    .ToListAsync();
-
-                return Ok(comments);
-            }
-
-            // Other roles are not allowed
-            return Forbid();
+            var comments = await _projectCommentService.GetCommentsForProjectAsync(projectId);
+            return Ok(comments);
         }
 
         [HttpGet("project/{projectId:int}/groups/{groupId:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zwraca komentarze dla projektu przefiltrowane po konkretnej grupie.
         /// </summary>
@@ -137,76 +71,15 @@ namespace wspolpracujmy.Controllers
             var projectExists = await _db.Projects.AnyAsync(p => p.Id == projectId);
             if (!projectExists) return NotFound();
 
-            var groupExists = await _db.Groups.AnyAsync(g => g.Id == groupId && g.ProjectId == projectId);
+            var groupExists = await _db.Groups.AnyAsync(g => g.Id == groupId);
             if (!groupExists) return NotFound();
 
-            var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+            int currentUserId = GetCurrentUserId();
+            if (!await CanAccessProjectAsync(projectId, currentUserId)) return Forbid();
+            if (!await CanViewGroupCommentsAsync(projectId, groupId, currentUserId)) return Forbid();
 
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
-
-            // Admin: see all comments
-            if (role == "Admin")
-            {
-                var comments = await _projectCommentService.GetCommentsForProjectByGroupAsync(projectId, groupId);
-                return Ok(comments);
-            }
-
-            // Company: only owning company may see all
-            if (role == "Company")
-            {
-                var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
-                if (project == null) return NotFound();
-                if (project.Company == null || project.Company.UserId != currentUserId) return Forbid();
-
-                var comments = await _projectCommentService.GetCommentsForProjectByGroupAsync(projectId, groupId);
-                return Ok(comments);
-            }
-
-            // Student: may view only if they belong to this group, and even then only company comments + responses by group members
-            if (role == "Student")
-            {
-                var currentStudent = await _db.Students.FirstOrDefaultAsync(s => s.UserId == currentUserId);
-                if (currentStudent == null) return Forbid();
-                if (!currentStudent.GroupId.HasValue || currentStudent.GroupId.Value != groupId) return Forbid();
-
-                var comments = await _db.Comments
-                    .Where(c => c.ProjectId == projectId && (
-                        c.User.Role == Models.Role.Company
-                        || _db.Students.Any(s => s.UserId == c.UserId && s.GroupId == groupId)
-                    ))
-                    .Include(c => c.User)
-                    .Include(c => c.Responses).ThenInclude(r => r.User).ThenInclude(u => u.Student)
-                    .Select(c => new CommentWithResponsesDto
-                    {
-                        Id = c.Id,
-                        UserId = c.UserId,
-                        UserName = c.User != null ? c.User.Name + " " + c.User.Surname : null,
-                        GroupId = _db.Students.Where(s => s.UserId == c.UserId).Select(s => (int?)s.GroupId).FirstOrDefault(),
-                        Content = c.Content,
-                        CreatedAt = c.CreatedAt,
-                        Responses = c.Responses
-                            .Where(r => r.User != null && (
-                                (r.User.Student != null && r.User.Student.GroupId.HasValue && r.User.Student.GroupId == groupId)
-                                || r.User.Role == Models.Role.Company
-                            ))
-                            .Select(r => new ResponseDto
-                            {
-                                Id = r.Id,
-                                UserId = r.UserId,
-                                UserName = r.User != null ? r.User.Name + " " + r.User.Surname : null,
-                                Content = r.Content,
-                                CreatedAt = r.CreatedAt
-                            }).ToList()
-                    })
-                    .ToListAsync();
-
-                return Ok(comments);
-            }
-
-            return Forbid();
+            var comments = await _projectCommentService.GetCommentsForProjectByGroupAsync(projectId, groupId);
+            return Ok(comments);
         }
 
         /*         [HttpGet("project/{projectId}")]
@@ -228,33 +101,46 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzony komentarz z kodem 201 Created.</returns>
         public async Task<ActionResult<Comment>> Post([FromBody] CreateCommentDto dto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            // authenticate and ensure caller matches dto.UserId (or is Admin)
-            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+            if (dto == null) return BadRequest("Brak danych komentarza.");
+            if (!ModelState.IsValid)
+            {
+                var validationMessage = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+                return BadRequest(validationMessage ?? "Nieprawidłowe dane komentarza.");
+            }
+            if (string.IsNullOrWhiteSpace(dto.Content))
+                return BadRequest("Treść komentarza jest wymagana.");
+            if (dto.ProjectId <= 0)
+                return BadRequest("Nieprawidłowy identyfikator projektu.");
+
+            if (!TryGetCurrentUserId(out var currentUserId))
                 return Unauthorized();
 
             var role = User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User?.FindFirst("role")?.Value;
+            var isAdmin = role == "Admin";
+            var isCompany = string.Equals(role, "Company", StringComparison.OrdinalIgnoreCase)
+                || role == ((int)Role.Company).ToString();
 
-            // For non-admins, force comment.UserId to current user and prevent spoofing
-            if (role != "Admin") dto.UserId = currentUserId;
+            if (!isAdmin && isCompany)
+                return Forbid("Firma odpowiada na komentarze studentów, nie dodaje nowych wątków.");
 
-            if (dto.UserId != currentUserId) return Forbid("Cannot comment as another user");
+            dto.UserId = currentUserId;
 
-            if (!await CanAccessProjectAsync(dto.ProjectId, currentUserId)) return Forbid("No access to this project");
+            if (!await CanAccessProjectAsync(dto.ProjectId, currentUserId))
+                return Forbid("Brak dostępu do tego projektu — dołącz do zespołu lub złóż zgłoszenie.");
 
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == dto.ProjectId);
             if (project == null) return NotFound($"Projekt o id {dto.ProjectId} nie został znaleziony.");
 
-            var user = await _db.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
+            var user = await _db.Users.FindAsync(currentUserId);
+            if (user == null) return NotFound($"Użytkownik o id {currentUserId} nie został znaleziony.");
 
             var comment = new Comment
             {
                 ProjectId = dto.ProjectId,
-                UserId = dto.UserId,
+                UserId = currentUserId,
                 Content = dto.Content,
                 CreatedAt = System.DateTime.UtcNow,
                 Project = project,
@@ -267,22 +153,18 @@ namespace wspolpracujmy.Controllers
             try
             {
                 // try to find group name for the commenting user (if the user is a student in a group)
-                var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == dto.UserId);
+                var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == currentUserId);
                 var groupName = student?.Group?.Name ?? "";
 
                 var recipientUserId = project.Company?.UserId ?? 0;
                 if (recipientUserId > 0)
                 {
-                    var content = string.Empty;
-                    if (!string.IsNullOrEmpty(groupName))
-                    {
-                        content = $"Zespół {groupName} napisał komentarz pod projektem {project.Topic}.";
-                    }
-                    else
-                    {
-                        // fallback to user's full name
-                        content = $"Student {user.Name} {user.Surname} napisał komentarz pod projektem {project.Topic}.";
-                    }
+                    var teamName = !string.IsNullOrEmpty(groupName)
+                        ? groupName
+                        : $"Student {user.Name} {user.Surname}".Trim();
+                    var content = Notification.FormatTeamCommentOnProject(teamName, project.Topic);
+                    var groupId = student?.GroupId ?? 0;
+                    var linkTarget = Notification.LinkTargetCompanyTeamComment(project.Id, groupId);
 
                     var recipientUser = await _db.Users.FindAsync(recipientUserId);
                     if (recipientUser != null)
@@ -294,22 +176,10 @@ namespace wspolpracujmy.Controllers
                             Status = wspolpracujmy.Models.NotificationStatus.NotRead,
                             User = recipientUser,
                             CreatedAt = System.DateTime.UtcNow,
-                            LinkTarget = $"project:{project.Id}"
+                            LinkTarget = linkTarget
                         };
 
                         _db.Notifications.Add(notification);
-                    }
-
-                    private static bool IsFatalException(System.Exception ex)
-                    {
-                        return ex is System.OutOfMemoryException
-                            || ex is System.StackOverflowException
-                            || ex is System.AccessViolationException
-                            || ex is System.AppDomainUnloadedException
-                            || ex is System.BadImageFormatException
-                            || ex is System.CannotUnloadAppDomainException
-                            || ex is System.InvalidProgramException
-                            || ex is System.Threading.ThreadAbortException;
                     }
                 }
             }
@@ -341,10 +211,7 @@ namespace wspolpracujmy.Controllers
                 .FirstOrDefaultAsync(cm => cm.Id == id);
             if (c == null) return NotFound();
             // Authorization: only Admin, comment owner, or owning company may delete
-            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+            if (!TryGetCurrentUserId(out var currentUserId))
                 return Unauthorized();
 
             var role = User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? User?.FindFirst("role")?.Value;
@@ -408,31 +275,70 @@ namespace wspolpracujmy.Controllers
             return NoContent();
         }
 
+        private bool TryGetCurrentUserId(out int userId)
+        {
+            userId = 0;
+            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? User?.FindFirst("id")?.Value
+                         ?? User?.FindFirst("sub")?.Value;
+            return !string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out userId);
+        }
+
         private int GetCurrentUserId()
         {
-            var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-            if (claim == null) throw new UnauthorizedAccessException("User not authenticated");
-            return int.Parse(claim.Value);
+            if (!TryGetCurrentUserId(out var userId))
+                throw new UnauthorizedAccessException("User not authenticated");
+            return userId;
         }
 
         private bool IsAdmin()
         {
-            var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role);
+            var roleClaim = User?.FindFirst(System.Security.Claims.ClaimTypes.Role);
             return roleClaim?.Value == "Admin";
+        }
+
+        private static bool IsFatalException(System.Exception ex)
+        {
+            return ex is System.OutOfMemoryException
+                || ex is System.StackOverflowException
+                || ex is System.AccessViolationException
+                || ex is System.AppDomainUnloadedException
+                || ex is System.BadImageFormatException
+                || ex is System.CannotUnloadAppDomainException
+                || ex is System.InvalidProgramException
+                || ex is System.Threading.ThreadAbortException;
         }
 
         private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
         {
-            // Check if user is the company owner
+            if (IsAdmin()) return true;
+
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
             if (project == null) return false;
-            if (project.Company.UserId == userId) return true;
+            if (project.Company != null && project.Company.UserId == userId) return true;
 
-            // Check if user is a member of a group in the project
             var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
-            if (student?.Group?.ProjectId == projectId) return true;
+            if (student?.GroupId == null) return false;
 
-            return false;
+            if (student.Group?.ProjectId == projectId) return true;
+
+            return await _db.GroupRequests.AnyAsync(gr =>
+                gr.GroupId == student.GroupId
+                && gr.ProjectId == projectId
+                && gr.Type != null
+                && EF.Functions.ILike(gr.Type, "projectrequest")
+                && (gr.Status == GroupStatus.Pending || gr.Status == GroupStatus.Accepted));
+        }
+
+        private async Task<bool> CanViewGroupCommentsAsync(int projectId, int groupId, int userId)
+        {
+            if (IsAdmin()) return true;
+
+            var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
+            if (project?.Company.UserId == userId) return true;
+
+            var student = await _db.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+            return student?.GroupId == groupId;
         }
     }
 }

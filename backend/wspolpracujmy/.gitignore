@@ -3,6 +3,7 @@
 ##
 ## Get latest from `dotnet new gitignore`
 raport_kornel_podzadania.md
+third-arcadia-494619-d2-1eaefd48496a.json
 
 # dotenv files
 .env
@@ -481,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+#sevice account
+third-arcadia-494619-d2-1eaefd48496a.json
+serviceAccount.json

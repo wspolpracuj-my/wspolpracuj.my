@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
-using Npgsql;
 using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -24,8 +23,35 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         public StudentsController(AppDbContext db) => _db = db;
 
+        [HttpGet]
+        /// <summary>
+        /// Zwraca listę wszystkich studentów (dostępne tylko dla administratora).
+        /// </summary>
+        public async Task<ActionResult<IEnumerable<AdminStudentDto>>> GetAll()
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var students = await _db.Students
+                .Include(s => s.User)
+                .Include(s => s.Group)
+                .OrderBy(s => s.User.Surname)
+                .ThenBy(s => s.User.Name)
+                .Select(s => new AdminStudentDto
+                {
+                    Id = s.Id,
+                    UserId = s.UserId,
+                    FullName = s.User.Name + " " + s.User.Surname,
+                    Email = s.Email,
+                    Login = s.User.Login,
+                    GroupId = s.GroupId,
+                    GroupName = s.Group != null ? s.Group.Name : null
+                })
+                .ToListAsync();
+
+            return Ok(students);
+        }
+
         [HttpGet("byEmail")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         public async Task<ActionResult<StudentDto>> GetByEmail([FromQuery] string? email)
         {
             if (string.IsNullOrWhiteSpace(email)) return BadRequest("Parametr zapytania 'email' jest wymagany.");
@@ -43,7 +69,6 @@ namespace wspolpracujmy.Controllers
         // public async Task<IEnumerable<Student>> Get() => await _db.Students.ToListAsync();
 
         [HttpGet("{id:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Pobiera studenta po identyfikatorze w postaci DTO.
         /// </summary>
@@ -53,6 +78,24 @@ namespace wspolpracujmy.Controllers
         {
             var student = await _db.Students
                 .Where(s => s.Id == id)
+                .Select(s => new StudentDto
+                {
+                    Id = s.Id,
+                    UserId = s.UserId,
+                    GroupId = s.GroupId,
+                    Email = s.Email
+                })
+                .FirstOrDefaultAsync();
+
+            if (student == null) return NotFound();
+            return Ok(student);
+        }
+
+        [HttpGet("byUser/{userId:int}")]
+        public async Task<ActionResult<StudentDto>> GetByUserId(int userId)
+        {
+            var student = await _db.Students
+                .Where(s => s.UserId == userId)
                 .Select(s => new StudentDto
                 {
                     Id = s.Id,
@@ -85,7 +128,6 @@ namespace wspolpracujmy.Controllers
         public class ChangeStudentGroupDto { public int? GroupId { get; set; } }
 
         [HttpPatch("{id:int}/group")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
         /// Zmienia grupę, do której należy student.
         /// </summary>
@@ -99,69 +141,54 @@ namespace wspolpracujmy.Controllers
             var student = await _db.Students.FindAsync(id);
             if (student == null) return NotFound();
 
-            var group = await _db.Groups.FindAsync(dto.GroupId);
-            if (group == null) return BadRequest(new { error = "Nie znaleziono grupy." });
+            if (dto.GroupId.HasValue)
+            {
+                var group = await _db.Groups.FindAsync(dto.GroupId.Value);
+                if (group == null) return BadRequest(new { error = "Nie znaleziono grupy." });
+            }
 
+            student.GroupId = dto.GroupId;
+            _db.Students.Update(student);
             await _db.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpDelete("{id:int}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
-        /// Usuwa studenta o podanym identyfikatorze.
+        /// Usuwa studenta o podanym identyfikatorze. Tylko administrator.
+        /// Usuwa również powiązane konto użytkownika (kaskada przez FK).
+        /// Jeśli student jest liderem zespołów, te zespoły są usuwane.
         /// </summary>
         /// <param name="id">Id studenta do usunięcia.</param>
         /// <returns>Brak treści (204) lub NotFound.</returns>
         public async Task<IActionResult> Delete(int id)
         {
-            var s = await _db.Students.AsNoTracking().Where(st => st.Id == id).FirstOrDefaultAsync();
+            if (!IsAdmin()) return Forbid();
+
+            var s = await _db.Students.Include(st => st.User).FirstOrDefaultAsync(st => st.Id == id);
             if (s == null) return NotFound();
 
-            var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                         ?? User?.FindFirst("id")?.Value
-                         ?? User?.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
-            var currentUser = await _db.Users.AsNoTracking().Where(u => u.Id == currentUserId).FirstOrDefaultAsync();
-            if (currentUser == null) return Unauthorized();
+            await using var transaction = await _db.Database.BeginTransactionAsync();
 
-            if (currentUser.Role != Role.Admin) return Forbid();
-
-            // If the student is a leader, for each group either assign the next member as leader
-            // or remove the group. To avoid EF circular dependency, persist intermediate
-            // changes with multiple SaveChangesAsync calls:
-            var groupsLed = await _db.Groups.Where(g => g.LeaderId == s.Id).ToListAsync();
-
-            foreach (var group in groupsLed)
+            // Usuń zespoły, w których student jest liderem (FK leader jest RESTRICT).
+            var ledGroups = await _db.Groups.Where(g => g.LeaderId == s.Id).ToListAsync();
+            if (ledGroups.Count > 0)
             {
-                var nextMember = await _db.Students
-                    .Where(st => st.GroupId == group.Id && st.Id != s.Id)
-                    .OrderBy(st => st.Id)
-                    .FirstOrDefaultAsync();
-
-                if (nextMember != null)
-                {
-                    group.LeaderId = nextMember.Id;
-                    _db.Groups.Update(group);
-                    await _db.SaveChangesAsync();
-                }
-                else
-                {
-                    // No other members -> unset leader, commit, then remove group
-                    group.LeaderId = null;
-                    _db.Groups.Update(group);
-                    await _db.SaveChangesAsync();
-
-                    _db.Groups.Remove(group);
-                    await _db.SaveChangesAsync();
-                }
+                _db.Groups.RemoveRange(ledGroups);
+                await _db.SaveChangesAsync();
             }
 
-            // Finally remove the student
-            var toDelete = await _db.Students.FindAsync(s.Id);
-            if (toDelete == null) return NotFound();
-            _db.Students.Remove(toDelete);
+            if (s.User != null)
+            {
+                _db.Users.Remove(s.User);
+            }
+            else
+            {
+                _db.Students.Remove(s);
+            }
             await _db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
             return NoContent();
         }
 

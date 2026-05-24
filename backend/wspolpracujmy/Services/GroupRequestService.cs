@@ -86,7 +86,7 @@ namespace wspolpracujmy.Services
                             // Final fallback: delete notifications using exact content pattern used when creating project request
                             var contentsToRemove = oldRequests
                                 .Where(r => r.Project != null)
-                                .Select(r => $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {r.Project.Topic}")
+                                .Select(r => $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {r.Project!.Topic}")
                                 .Distinct()
                                 .ToList();
 
@@ -115,6 +115,12 @@ namespace wspolpracujmy.Services
 
                 _db.GroupRequests.Add(entity);
 
+                // As soon as ProjectRequest is created, reflect pending assignment on the group.
+                // This keeps group state consistent with the expected UX (project number + pending status visible immediately).
+                group.ProjectId = projectId;
+                group.IsAccepted = GroupStatus.Pending;
+                _db.Groups.Update(group);
+
                 // Notify company user if available
                 if (project.Company != null)
                 {
@@ -134,8 +140,9 @@ namespace wspolpracujmy.Services
                     var companyUser = await _db.Users.FindAsync(project.Company.UserId);
                     if (companyUser != null)
                     {
-                        var content = $"Grupa {group.Name} wysłała prośbę o realizację Twojego projektu: {project.Topic}";
-                        await _notificationService.CreateNotificationAsync(companyUser.Id, content, linkTarget: $"/requests/{entity.Id}", groupRequestId: entity.Id);
+                        var content = Notification.FormatTeamProjectApplication(group.Name, project.Topic);
+                        var linkTarget = Notification.LinkTargetCompanyTeamApplication(project.Id, entity.Id);
+                        await _notificationService.CreateNotificationAsync(companyUser.Id, content, linkTarget, entity.Id);
                     }
                 }
 

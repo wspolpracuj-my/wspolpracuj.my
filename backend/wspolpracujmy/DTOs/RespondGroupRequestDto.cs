@@ -1,5 +1,8 @@
 namespace wspolpracujmy.DTOs
 {
+    /// <summary>
+    /// DTO z decyzją użytkownika dotyczącą żądania grupowego.
+    /// </summary>
     public class RespondGroupRequestDto
     {
         public int RespondedByUserId { get; set; }
