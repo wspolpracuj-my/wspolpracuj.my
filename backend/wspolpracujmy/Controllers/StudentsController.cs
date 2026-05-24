@@ -23,6 +23,34 @@ namespace wspolpracujmy.Controllers
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
         public StudentsController(AppDbContext db) => _db = db;
 
+        [HttpGet]
+        /// <summary>
+        /// Zwraca listę wszystkich studentów (dostępne tylko dla administratora).
+        /// </summary>
+        public async Task<ActionResult<IEnumerable<AdminStudentDto>>> GetAll()
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var students = await _db.Students
+                .Include(s => s.User)
+                .Include(s => s.Group)
+                .OrderBy(s => s.User.Surname)
+                .ThenBy(s => s.User.Name)
+                .Select(s => new AdminStudentDto
+                {
+                    Id = s.Id,
+                    UserId = s.UserId,
+                    FullName = s.User.Name + " " + s.User.Surname,
+                    Email = s.Email,
+                    Login = s.User.Login,
+                    GroupId = s.GroupId,
+                    GroupName = s.Group != null ? s.Group.Name : null
+                })
+                .ToListAsync();
+
+            return Ok(students);
+        }
+
         [HttpGet("byEmail")]
         public async Task<ActionResult<StudentDto>> GetByEmail([FromQuery] string? email)
         {
@@ -127,16 +155,40 @@ namespace wspolpracujmy.Controllers
 
         [HttpDelete("{id:int}")]
         /// <summary>
-        /// Usuwa studenta o podanym identyfikatorze.
+        /// Usuwa studenta o podanym identyfikatorze. Tylko administrator.
+        /// Usuwa również powiązane konto użytkownika (kaskada przez FK).
+        /// Jeśli student jest liderem zespołów, te zespoły są usuwane.
         /// </summary>
         /// <param name="id">Id studenta do usunięcia.</param>
         /// <returns>Brak treści (204) lub NotFound.</returns>
         public async Task<IActionResult> Delete(int id)
         {
-            var s = await _db.Students.FindAsync(id);
+            if (!IsAdmin()) return Forbid();
+
+            var s = await _db.Students.Include(st => st.User).FirstOrDefaultAsync(st => st.Id == id);
             if (s == null) return NotFound();
-            _db.Students.Remove(s);
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            // Usuń zespoły, w których student jest liderem (FK leader jest RESTRICT).
+            var ledGroups = await _db.Groups.Where(g => g.LeaderId == s.Id).ToListAsync();
+            if (ledGroups.Count > 0)
+            {
+                _db.Groups.RemoveRange(ledGroups);
+                await _db.SaveChangesAsync();
+            }
+
+            if (s.User != null)
+            {
+                _db.Users.Remove(s.User);
+            }
+            else
+            {
+                _db.Students.Remove(s);
+            }
             await _db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
             return NoContent();
         }
 

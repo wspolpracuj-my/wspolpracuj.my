@@ -10,8 +10,8 @@ namespace wspolpracujmy.DTOs
         [Required]
         public int ProjectId { get; set; }
 
-        [Required]
-        public int UserId { get; set; }
+        /// <summary>Ustawiane po stronie serwera z tokena JWT — nie trzeba wysyłać z klienta.</summary>
+        public int? UserId { get; set; }
 
         [Required]
         [StringLength(4000)]

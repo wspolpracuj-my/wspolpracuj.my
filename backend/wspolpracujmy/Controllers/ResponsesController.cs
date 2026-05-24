@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -5,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
+using wspolpracujmy.Services;
 using Microsoft.AspNetCore.Authorization;
 
 
@@ -19,11 +21,13 @@ namespace wspolpracujmy.Controllers
     public class ResponsesController : ControllerBase
     {
         private readonly AppDbContext _db;
-        /// <summary>
-        /// Tworzy kontroler odpowiedzi z kontekstem bazy danych.
-        /// </summary>
-        /// <param name="db">Kontekst bazy danych aplikacji.</param>
-        public ResponsesController(AppDbContext db) => _db = db;
+        private readonly NotificationService _notifications;
+
+        public ResponsesController(AppDbContext db, NotificationService notifications)
+        {
+            _db = db;
+            _notifications = notifications;
+        }
 
         // [HttpGet]
         // Removed: return-all endpoint (use GET /api/responses/comment/{commentId} instead)
@@ -37,10 +41,10 @@ namespace wspolpracujmy.Controllers
         /// <returns>Lista DTO odpowiedzi.</returns>
         public async Task<ActionResult<List<ResponseDto>>> GetByComment(int commentId)
         {
-            if (commentId <= 0) return BadRequest("Parametr commentId musi być większy niż 0.");
+            if (commentId <= 0) return BadRequest(new { error = "Nieprawidłowy numer komentarza." });
 
             var comment = await _db.Comments.Include(c => c.Project).FirstOrDefaultAsync(c => c.Id == commentId);
-            if (comment == null) return NotFound();
+            if (comment == null) return NotFound(new { error = "Komentarz nie został znaleziony." });
 
             int currentUserId = GetCurrentUserId();
             if (!await CanAccessProjectAsync(comment.ProjectId, currentUserId)) return Forbid();
@@ -70,7 +74,10 @@ namespace wspolpracujmy.Controllers
         /// <returns>Utworzona odpowiedź z kodem 201 Created.</returns>
         public async Task<ActionResult<Response>> Post([FromBody] CreateResponseDto dto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (dto == null) return BadRequest("Brak danych odpowiedzi.");
+            if (dto.CommentId <= 0) return BadRequest("Nieprawidłowy identyfikator komentarza.");
+            if (string.IsNullOrWhiteSpace(dto.Content))
+                return BadRequest("Treść odpowiedzi jest wymagana.");
 
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                          ?? User?.FindFirst("id")?.Value
@@ -78,21 +85,33 @@ namespace wspolpracujmy.Controllers
             if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
                 return Unauthorized();
 
-            // prevent spoofing: set response author to current user
+            var role = User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                ?? User?.FindFirst("role")?.Value;
+            var isAdmin = role == "Admin";
+            var isCompany = string.Equals(role, "Company", StringComparison.OrdinalIgnoreCase)
+                || role == ((int)Role.Company).ToString();
+
+            if (!isAdmin && !isCompany)
+                return Forbid("Tylko firma może odpowiadać na komentarze studentów.");
+
             dto.UserId = currentUserId;
 
-            var comment = await _db.Comments.FindAsync(dto.CommentId);
+            var comment = await _db.Comments
+                .Include(c => c.Project)
+                    .ThenInclude(p => p!.Company)
+                .FirstOrDefaultAsync(c => c.Id == dto.CommentId);
             if (comment == null) return NotFound($"Komentarz o id {dto.CommentId} nie został znaleziony.");
 
-            if (!await CanAccessProjectAsync(comment.ProjectId, currentUserId)) return Forbid("No access to this project");
+            if (!isAdmin && (comment.Project?.Company == null || comment.Project.Company.UserId != currentUserId))
+                return Forbid("Możesz odpowiadać tylko na komentarze pod swoimi projektami.");
 
-            var user = await _db.Users.FindAsync(dto.UserId);
+            var user = await _db.Users.FindAsync(currentUserId);
             if (user == null) return NotFound($"Użytkownik o id {dto.UserId} nie został znaleziony.");
 
             var response = new Response
             {
                 CommentId = dto.CommentId,
-                UserId = dto.UserId,
+                UserId = currentUserId,
                 Content = dto.Content,
                 CreatedAt = DateTime.UtcNow,
                 Comment = comment,
@@ -101,6 +120,20 @@ namespace wspolpracujmy.Controllers
 
             _db.Responses.Add(response);
             await _db.SaveChangesAsync();
+
+            try
+            {
+                var companyName = comment.Project?.Company?.CompanyName ?? "Firma";
+                var projectName = comment.Project?.Topic ?? "projekt";
+                var notifyContent = Notification.FormatCompanyCommentReply(companyName, projectName);
+                var linkTarget = Notification.LinkTargetCommentReply(comment.ProjectId);
+                await _notifications.CreateNotificationAsync(comment.UserId, notifyContent, linkTarget);
+            }
+            catch
+            {
+                // Powiadomienie nie jest krytyczne dla zapisu odpowiedzi.
+            }
+
             return CreatedAtAction(nameof(GetByComment), new { commentId = response.CommentId }, response);
         }
 
@@ -119,16 +152,20 @@ namespace wspolpracujmy.Controllers
 
         private async Task<bool> CanAccessProjectAsync(int projectId, int userId)
         {
-            // Check if user is the company owner
             var project = await _db.Projects.Include(p => p.Company).FirstOrDefaultAsync(p => p.Id == projectId);
             if (project == null) return false;
             if (project.Company.UserId == userId) return true;
 
-            // Check if user is a member of a group in the project
             var student = await _db.Students.Include(s => s.Group).FirstOrDefaultAsync(s => s.UserId == userId);
-            if (student?.Group?.ProjectId == projectId) return true;
+            if (student?.GroupId == null) return false;
+            if (student.Group?.ProjectId == projectId) return true;
 
-            return false;
+            return await _db.GroupRequests.AnyAsync(gr =>
+                gr.GroupId == student.GroupId
+                && gr.ProjectId == projectId
+                && gr.Type != null
+                && EF.Functions.ILike(gr.Type, "projectrequest")
+                && (gr.Status == GroupStatus.Pending || gr.Status == GroupStatus.Accepted));
         }
     }
 }

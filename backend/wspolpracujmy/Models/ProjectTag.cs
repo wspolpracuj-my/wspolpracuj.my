@@ -12,7 +12,6 @@ namespace wspolpracujmy.Models
     {
         [Required]
         [Column("project_id")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int ProjectId { get; set; }
 
         [Required]

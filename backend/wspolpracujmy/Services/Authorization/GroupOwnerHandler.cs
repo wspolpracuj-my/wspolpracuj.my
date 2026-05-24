@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace wspolpracujmy.Services.Authorization
 {
+    /// <summary>
+    /// Handler autoryzacji sprawdzający, czy student jest liderem wskazanej grupy.
+    /// </summary>
     public class GroupOwnerHandler : AuthorizationHandler<GroupOwnerRequirement>
     {
         private readonly AppDbContext _db;
@@ -16,6 +19,9 @@ namespace wspolpracujmy.Services.Authorization
             _db = db;
         }
 
+        /// <summary>
+        /// Weryfikuje wymaganie właściciela grupy na podstawie route values i danych z bazy.
+        /// </summary>
         protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, GroupOwnerRequirement requirement)
         {
             // Extract HttpContext from resource (works for MVC)

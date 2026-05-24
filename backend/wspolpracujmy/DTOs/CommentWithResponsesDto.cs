@@ -12,6 +12,8 @@ namespace wspolpracujmy.DTOs
         public int UserId { get; set; }
         public string? UserName { get; set; }
         public int? GroupId { get; set; }
+        public string? GroupName { get; set; }
+        public int ProjectId { get; set; }
         public string Content { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public List<ResponseDto> Responses { get; set; } = new List<ResponseDto>();

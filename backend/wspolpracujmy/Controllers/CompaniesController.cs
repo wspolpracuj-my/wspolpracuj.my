@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using wspolpracujmy.Data;
 using wspolpracujmy.DTOs;
 using wspolpracujmy.Models;
+using wspolpracujmy.Services;
 
 namespace wspolpracujmy.Controllers
 {
@@ -18,23 +19,32 @@ namespace wspolpracujmy.Controllers
     public class CompaniesController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly JwtTokenService _jwtTokenService;
         /// <summary>
         /// Tworzy kontroler firm z kontekstem bazy danych.
         /// </summary>
         /// <param name="db">Kontekst bazy danych aplikacji.</param>
-        public CompaniesController(AppDbContext db) => _db = db;
+        /// <param name="jwtTokenService">Serwis generowania tokenów JWT.</param>
+        public CompaniesController(AppDbContext db, JwtTokenService jwtTokenService)
+        {
+            _db = db;
+            _jwtTokenService = jwtTokenService;
+        }
 
         [HttpGet]
         /// <summary>
         /// Zwraca listę wszystkich firm z podstawowymi danymi.
         /// </summary>
         /// <returns>Listę DTO podsumowania firm.</returns>
-        public async Task<IEnumerable<CompanySummaryDto>> Get() => await _db.Companies
-            .Select(c => new CompanySummaryDto
+        public async Task<IEnumerable<AdminCompanyDto>> Get() => await _db.Companies
+            .Include(c => c.User)
+            .OrderBy(c => c.CompanyName)
+            .Select(c => new AdminCompanyDto
             {
                 Id = c.Id,
                 UserId = c.UserId,
                 CompanyName = c.CompanyName,
+                Login = c.User != null ? c.User.Login : string.Empty,
                 ContactEmail = c.ContactEmail
             })
             .ToListAsync();
@@ -155,6 +165,68 @@ namespace wspolpracujmy.Controllers
             return NoContent();
         }
 
+        [HttpPost("admin")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        /// <summary>
+        /// Tworzy nową firmę razem z kontem użytkownika. Endpoint przeznaczony dla administratora.
+        /// </summary>
+        /// <param name="dto">Dane firmy + dane logowania użytkownika.</param>
+        /// <returns>Dane utworzonej firmy.</returns>
+        public async Task<ActionResult<AdminCompanyDto>> PostAsAdmin([FromBody] AdminCompanyCreateDto dto)
+        {
+            if (!IsAdmin()) return Forbid();
+
+            if (dto == null) return BadRequest("Brak danych firmy.");
+            if (string.IsNullOrWhiteSpace(dto.CompanyName)) return BadRequest("Nazwa firmy jest wymagana.");
+            if (string.IsNullOrWhiteSpace(dto.Login)) return BadRequest("Login jest wymagany.");
+            if (string.IsNullOrWhiteSpace(dto.Password)) return BadRequest("Hasło jest wymagane.");
+
+            var loginNormalized = dto.Login.Trim();
+            if (await _db.Users.AnyAsync(u => u.Login == loginNormalized))
+            {
+                return Conflict(new { message = "Login jest już zajęty." });
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            var user = new User
+            {
+                Name = dto.CompanyName.Trim(),
+                Surname = "(firma)",
+                Login = loginNormalized,
+                PasswordHash = passwordHash,
+                Role = Role.Company
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            var company = new Company
+            {
+                UserId = user.Id,
+                CompanyName = dto.CompanyName.Trim(),
+                ContactEmail = string.IsNullOrWhiteSpace(dto.ContactEmail) ? null : dto.ContactEmail.Trim(),
+                User = user
+            };
+
+            _db.Companies.Add(company);
+            await _db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            var result = new AdminCompanyDto
+            {
+                Id = company.Id,
+                UserId = company.UserId,
+                CompanyName = company.CompanyName,
+                Login = user.Login,
+                ContactEmail = company.ContactEmail
+            };
+
+            return CreatedAtAction(nameof(Get), new { id = company.Id }, result);
+        }
+
         [HttpDelete("{id:int}")]
         [Microsoft.AspNetCore.Authorization.Authorize]
         /// <summary>
@@ -164,7 +236,7 @@ namespace wspolpracujmy.Controllers
         /// <returns>Brak treści (204) lub NotFound.</returns>
         public async Task<IActionResult> Delete(int id)
         {
-            var c = await _db.Companies.FindAsync(id);
+            var c = await _db.Companies.Include(co => co.User).FirstOrDefaultAsync(co => co.Id == id);
             if (c == null) return NotFound();
 
             var userIdStr = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -177,7 +249,15 @@ namespace wspolpracujmy.Controllers
             var isAdmin = currentUser.Role == Role.Admin;
             if (!isAdmin && c.UserId != currentUserId) return Forbid();
 
-            _db.Companies.Remove(c);
+            // Usuń konto użytkownika — kaskada (FK) usunie również rekord firmy.
+            if (c.User != null)
+            {
+                _db.Users.Remove(c.User);
+            }
+            else
+            {
+                _db.Companies.Remove(c);
+            }
             await _db.SaveChangesAsync();
             return NoContent();
         }

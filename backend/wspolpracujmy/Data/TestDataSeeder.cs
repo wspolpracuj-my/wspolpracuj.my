@@ -10,8 +10,14 @@ using BCrypt.Net;
 
 namespace wspolpracujmy.Data
 {
+    /// <summary>
+    /// Seeder przygotowujący przykładowe dane testowe dla środowiska developerskiego.
+    /// </summary>
     public static class TestDataSeeder
     {
+        /// <summary>
+        /// Wypełnia bazę danych zestawem danych testowych.
+        /// </summary>
         public static async Task SeedAsync(WebApplication app)
         {
             using var scope = app.Services.CreateScope();
@@ -31,8 +37,32 @@ namespace wspolpracujmy.Data
                 logger.LogWarning(ex, "Failed to run GroupRequests.status cleanup; continuing.");
             }
 
+            // Always ensure that the admin account exists (independent of full test seeding).
+            try
+            {
+                var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Login == "admin");
+                if (existingAdmin == null)
+                {
+                    var admin = new User
+                    {
+                        Name = "Admin",
+                        Surname = "Systemu",
+                        Role = Role.Admin,
+                        Login = "admin",
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin")
+                    };
+                    context.Users.Add(admin);
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Seeded default admin user (login: admin).");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to ensure admin user exists; continuing.");
+            }
+
             // avoid seeding when data already present
-            if (await context.Users.AnyAsync())
+            if (await context.Users.CountAsync() > 1)
             {
                 logger.LogInformation("Test seeder skipped: Users already exist.");
                 return;

@@ -8,10 +8,22 @@ namespace wspolpracujmy.Models
 {
     [Table("GroupRequests")]
     /// <summary>
-    /// Żądanie dołączenia do grupy wysyłane przez studenta.
+    /// Żądanie dołączenia do grupy wysyłane przez studenta lub lidera (zaproszenie).
     /// </summary>
     public class GroupRequest
     {
+        public const string InvitationType = "Invitation";
+
+        public static bool IsInvitationType(string? type)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+                return false;
+
+            var normalized = type.Trim();
+            return normalized.Equals(InvitationType, StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("invite", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("invitation", StringComparison.OrdinalIgnoreCase);
+        }
         [Key]
         [Column("id")]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]

@@ -1,14 +1,15 @@
 using System;
-using wspolpracujmy.Models;
 
 namespace wspolpracujmy.DTOs
 {
+    /// <summary>
+    /// Powiadomienie do wyświetlenia w UI (tylko tekst, bez linków).
+    /// </summary>
     public class NotificationDto
     {
         public int Id { get; set; }
         public string Content { get; set; } = string.Empty;
-        public NotificationStatus Status { get; set; }
+        public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
-        public string? LinkTarget { get; set; }
     }
 }

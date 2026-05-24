@@ -13,25 +13,6 @@ namespace wspolpracujmy.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "GroupRequests",
-                columns: table => new
-                {
-                    id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    group_id = table.Column<int>(type: "integer", nullable: false),
-                    student_id = table.Column<int>(type: "integer", nullable: false),
-                    created_by_user_id = table.Column<int>(type: "integer", nullable: false),
-                    status = table.Column<string>(type: "text", nullable: false),
-                    type = table.Column<string>(type: "text", nullable: true),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    responded_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_GroupRequests", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Meeting_types",
                 columns: table => new
                 {
@@ -114,29 +95,6 @@ namespace wspolpracujmy.Migrations
                     table.PrimaryKey("PK_Files", x => x.id);
                     table.ForeignKey(
                         name: "FK_Files_Users_user_id",
-                        column: x => x.user_id,
-                        principalTable: "Users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Notifications",
-                columns: table => new
-                {
-                    id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    user_id = table.Column<int>(type: "integer", nullable: false),
-                    content = table.Column<string>(type: "text", nullable: false),
-                    status = table.Column<string>(type: "text", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    link_target = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Notifications", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_Notifications_Users_user_id",
                         column: x => x.user_id,
                         principalTable: "Users",
                         principalColumn: "id",
@@ -295,15 +253,85 @@ namespace wspolpracujmy.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "GroupRequests",
+                columns: table => new
+                {
+                    id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    group_id = table.Column<int>(type: "integer", nullable: false),
+                    project_id = table.Column<int>(type: "integer", nullable: true),
+                    student_id = table.Column<int>(type: "integer", nullable: true),
+                    created_by_user_id = table.Column<int>(type: "integer", nullable: false),
+                    status = table.Column<string>(type: "text", nullable: false),
+                    type = table.Column<string>(type: "text", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    responded_by_user_id = table.Column<int>(type: "integer", nullable: true),
+                    responded_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GroupRequests", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_GroupRequests_Project_project_id",
+                        column: x => x.project_id,
+                        principalTable: "Project",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_GroupRequests_Users_created_by_user_id",
+                        column: x => x.created_by_user_id,
+                        principalTable: "Users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_GroupRequests_Users_responded_by_user_id",
+                        column: x => x.responded_by_user_id,
+                        principalTable: "Users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Notifications",
+                columns: table => new
+                {
+                    id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    user_id = table.Column<int>(type: "integer", nullable: false),
+                    content = table.Column<string>(type: "text", nullable: false),
+                    status = table.Column<string>(type: "text", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    link_target = table.Column<string>(type: "text", nullable: true),
+                    group_request_id = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Notifications", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_Notifications_GroupRequests_group_request_id",
+                        column: x => x.group_request_id,
+                        principalTable: "GroupRequests",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Notifications_Users_user_id",
+                        column: x => x.user_id,
+                        principalTable: "Users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Groups",
                 columns: table => new
                 {
                     id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     name = table.Column<string>(type: "text", nullable: false),
-                    project_id = table.Column<int>(type: "integer", nullable: false),
-                    is_accepted = table.Column<string>(type: "text", nullable: false),
-                    leader_id = table.Column<int>(type: "integer", nullable: true)
+                    project_id = table.Column<int>(type: "integer", nullable: true),
+                    is_accepted = table.Column<string>(type: "text", nullable: true),
+                    leader_id = table.Column<int>(type: "integer", nullable: true),
+                    max_members = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -313,7 +341,7 @@ namespace wspolpracujmy.Migrations
                         column: x => x.project_id,
                         principalTable: "Project",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -323,7 +351,7 @@ namespace wspolpracujmy.Migrations
                     id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     user_id = table.Column<int>(type: "integer", nullable: false),
-                    group_id = table.Column<int>(type: "integer", nullable: false),
+                    group_id = table.Column<int>(type: "integer", nullable: true),
                     email = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
@@ -334,7 +362,7 @@ namespace wspolpracujmy.Migrations
                         column: x => x.group_id,
                         principalTable: "Groups",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "FK_Students_Users_user_id",
                         column: x => x.user_id,
@@ -375,6 +403,31 @@ namespace wspolpracujmy.Migrations
                 column: "file_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_GroupRequests_created_by_user_id",
+                table: "GroupRequests",
+                column: "created_by_user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GroupRequests_group_id",
+                table: "GroupRequests",
+                column: "group_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GroupRequests_project_id",
+                table: "GroupRequests",
+                column: "project_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GroupRequests_responded_by_user_id",
+                table: "GroupRequests",
+                column: "responded_by_user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GroupRequests_student_id",
+                table: "GroupRequests",
+                column: "student_id");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Groups_leader_id",
                 table: "Groups",
                 column: "leader_id");
@@ -383,6 +436,11 @@ namespace wspolpracujmy.Migrations
                 name: "IX_Groups_project_id",
                 table: "Groups",
                 column: "project_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Notifications_group_request_id",
+                table: "Notifications",
+                column: "group_request_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Notifications_user_id",
@@ -442,6 +500,22 @@ namespace wspolpracujmy.Migrations
                 onDelete: ReferentialAction.Cascade);
 
             migrationBuilder.AddForeignKey(
+                name: "FK_GroupRequests_Groups_group_id",
+                table: "GroupRequests",
+                column: "group_id",
+                principalTable: "Groups",
+                principalColumn: "id",
+                onDelete: ReferentialAction.Cascade);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_GroupRequests_Students_student_id",
+                table: "GroupRequests",
+                column: "student_id",
+                principalTable: "Students",
+                principalColumn: "id",
+                onDelete: ReferentialAction.Cascade);
+
+            migrationBuilder.AddForeignKey(
                 name: "FK_Groups_Students_leader_id",
                 table: "Groups",
                 column: "leader_id",
@@ -476,9 +550,6 @@ namespace wspolpracujmy.Migrations
                 name: "GroupFiles");
 
             migrationBuilder.DropTable(
-                name: "GroupRequests");
-
-            migrationBuilder.DropTable(
                 name: "Notifications");
 
             migrationBuilder.DropTable(
@@ -489,6 +560,9 @@ namespace wspolpracujmy.Migrations
 
             migrationBuilder.DropTable(
                 name: "Files");
+
+            migrationBuilder.DropTable(
+                name: "GroupRequests");
 
             migrationBuilder.DropTable(
                 name: "Tags");

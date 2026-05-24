@@ -12,8 +12,8 @@ using wspolpracujmy.Data;
 namespace wspolpracujmy.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260508172844_AutoMigrationForModels")]
-    partial class AutoMigrationForModels
+    [Migration("20260516181944_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -254,6 +254,10 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("responded_at");
 
+                    b.Property<int?>("RespondedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("responded_by_user_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -274,6 +278,8 @@ namespace wspolpracujmy.Migrations
                     b.HasIndex("GroupId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("RespondedByUserId");
 
                     b.HasIndex("StudentId");
 
@@ -318,6 +324,10 @@ namespace wspolpracujmy.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int?>("GroupRequestId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_request_id");
+
                     b.Property<string>("LinkTarget")
                         .HasColumnType("text")
                         .HasColumnName("link_target");
@@ -332,6 +342,8 @@ namespace wspolpracujmy.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GroupRequestId");
 
                     b.HasIndex("UserId");
 
@@ -667,6 +679,11 @@ namespace wspolpracujmy.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("wspolpracujmy.Models.User", "RespondedByUser")
+                        .WithMany()
+                        .HasForeignKey("RespondedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("wspolpracujmy.Models.Student", "Student")
                         .WithMany("GroupRequests")
                         .HasForeignKey("StudentId")
@@ -678,16 +695,25 @@ namespace wspolpracujmy.Migrations
 
                     b.Navigation("Project");
 
+                    b.Navigation("RespondedByUser");
+
                     b.Navigation("Student");
                 });
 
             modelBuilder.Entity("wspolpracujmy.Models.Notification", b =>
                 {
+                    b.HasOne("wspolpracujmy.Models.GroupRequest", "GroupRequest")
+                        .WithMany()
+                        .HasForeignKey("GroupRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("wspolpracujmy.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("GroupRequest");
 
                     b.Navigation("User");
                 });

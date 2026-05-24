@@ -5,7 +5,7 @@
 namespace wspolpracujmy.Migrations
 {
     /// <inheritdoc />
-    public partial class RefactorGroupRequestNotifications : Migration
+    public partial class UserRequestedMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -127,6 +127,15 @@ CREATE TABLE "ProjectTags" (
   PRIMARY KEY ("project_id", "tag_id")
 );
 
+CREATE TABLE "ProjectFiles" (
+  "id" uuid PRIMARY KEY,
+  "original_file_name" character varying(255) NOT NULL,
+  "gcs_object_name" character varying(512) NOT NULL,
+  "content_type" character varying(255) NOT NULL,
+  "team_id" integer NOT NULL,
+  "upload_date" timestamp with time zone NOT NULL
+);
+
 ALTER TABLE "Companies"
   ADD CONSTRAINT "FK_Companies_Users_user_id"
   FOREIGN KEY ("user_id") REFERENCES "Users" ("id") ON DELETE CASCADE;
@@ -252,3 +261,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_group_application_pending
 CREATE UNIQUE INDEX IF NOT EXISTS ux_group_projectreq_pending
   ON "GroupRequests"(group_id, project_id)
   WHERE type = 'ProjectRequest' AND status = 'Pending' AND project_id IS NOT NULL;
+
+-- Seed meeting types required by project FK (ids 1–3 match firma.html form)
+INSERT INTO "Meeting_types" ("id", "type") VALUES
+  (1, 'Online'),
+  (2, 'Stacjonarne'),
+  (3, 'Hybrydowe')
+ON CONFLICT ("id") DO NOTHING;
