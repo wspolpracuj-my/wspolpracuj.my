@@ -183,8 +183,9 @@ if (app.Environment.IsDevelopment())
     // Seed development data (runs only in Development)
     // First run the dedicated TagsSeeder so tag names are controlled separately.
     // await TagsSeeder.SeedAsync(app);
-    // await TestDataSeeder.SeedAsync(app);
 }
+
+await TestDataSeeder.SeedAsync(app);
 app.UseRouting();
 app.UseCors(AllowFrontend);
 
