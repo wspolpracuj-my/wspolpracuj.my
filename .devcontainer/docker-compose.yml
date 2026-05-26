@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:18
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wspolpracujmy
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql
+      - ../backend/wspolpracujmy/init.sql:/docker-entrypoint-initdb.d/init.sql:z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wspolpracujmy -h localhost -p 5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../backend/wspolpracujmy
+      dockerfile: .devcontainer/Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8081
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=wspolpracujmy;Username=postgres;Password=postgres
+      JwtSettings__SecretKey: "TwójSuperTajnyKluczJWT12345678901234567890"
+      JwtSettings__Issuer: "wspolpracujmy"
+      JwtSettings__Audience: "wspolpracujmy"
+    ports:
+      - "8081:8081"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_prod_data:

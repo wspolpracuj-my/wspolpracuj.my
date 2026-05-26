@@ -18,14 +18,23 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(AllowFrontend, policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5500",
-                "http://127.0.0.1:5500",
-                "http://localhost:3000",   
-                "http://127.0.0.1:3000"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        policy.SetIsOriginAllowed(origin =>
+               {
+                   var uri = new Uri(origin);
+
+                   // 1. Sprawdzamy czy host to localhost lub 127.0.0.1
+                   bool isLocal = uri.Host == "localhost" || uri.Host == "127.0.0.1";
+
+                   // 2. Sprawdzamy czy port to 80 (HTTP) lub 443 (HTTPS)
+                   // Klasa Uri automatycznie przypisuje port 80 dla http:// i 443 dla https:// 
+                   // nawet jeśli przeglądarka go nie dopisała w nagłówku!
+                   bool isCorrectPort = uri.Port == 80 || uri.Port == 443;
+
+                   return isLocal && isCorrectPort;
+               })
+               .AllowAnyHeader()
+               .AllowAnyMethod()
+               .AllowCredentials();
     });
 });
 
@@ -126,6 +135,7 @@ var baselineMigrationIds = new[]
     "20260507210134_AddGroupMaxMembers",
     "20260508172844_AutoMigrationForModels",
     "20260508215419_RefactorGroupRequestNotifications",
+    "20260513164300_AddProjectFiles",
     "20260516181944_InitialCreate"
 };
 
@@ -175,11 +185,11 @@ if (app.Environment.IsDevelopment())
     // await TagsSeeder.SeedAsync(app);
     // await TestDataSeeder.SeedAsync(app);
 }
+app.UseRouting();
 app.UseCors(AllowFrontend);
 
 app.UseAuthentication();
 app.UseAuthorization();
-
 
 app.MapControllers();
 
